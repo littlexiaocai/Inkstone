@@ -1,6 +1,6 @@
 # Upstream components
 
-This plugin embeds the unmodified production Worker from:
+Inkstone (砚台输入法) embeds the unmodified production Worker from:
 
 - Project: My RIME
 - Version: 0.10.9
@@ -8,4 +8,4 @@ This plugin embeds the unmodified production Worker from:
 - Package: https://www.npmjs.com/package/@libreservice/my-rime/v/0.10.9
 - License: AGPL-3.0-or-later
 
-The embedded file is `vendor/my-rime-worker.txt`, copied from the npm package's `dist/worker.js`. At runtime it downloads the matching RIME JavaScript, WebAssembly data, and the selected schema from the URLs defined by that upstream Worker.
+The embedded file is `src/vendor/my-rime-worker.txt`, copied from the npm package's `dist/worker.js`. At runtime it downloads the matching RIME JavaScript, WebAssembly data, and the selected schema from the URLs defined by that upstream Worker.
