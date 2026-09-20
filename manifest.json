@@ -1,7 +1,7 @@
 {
   "id": "inkstone",
   "name": "砚台输入法",
-  "version": "0.7.4",
+  "version": "0.7.5",
   "minAppVersion": "1.5.0",
   "description": "在 Obsidian 编辑器内直接输入中文与表情，绕开系统中文输入法的延迟。引擎基于 RIME。",
   "author": "littlexiaocai",

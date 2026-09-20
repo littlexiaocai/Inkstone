@@ -332,10 +332,10 @@ function searchEmoji(query, limit) {
 }
 
 // src/main.ts
-var PLUGIN_VERSION = "0.7.4";
+var PLUGIN_VERSION = "0.7.5";
 var PROBE_URL = "https://cdn.jsdelivr.net/npm/@libreservice/my-rime@0.10.9/dist/rime.js";
 var INIT_TIMEOUT_MS = 45e3;
-var MAX_TRACE = 24;
+var MAX_TRACE = 60;
 var REPORT_FOLDER = "\u781A\u53F0\u8BCA\u65AD";
 var IME_WARN_COOLDOWN_MS = 30 * 1e3;
 var IME_EVIDENCE_TTL_MS = 10 * 60 * 1e3;
