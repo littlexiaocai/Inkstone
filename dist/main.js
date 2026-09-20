@@ -332,12 +332,13 @@ function searchEmoji(query, limit) {
 }
 
 // src/main.ts
-var PLUGIN_VERSION = "0.7.9";
+var PLUGIN_VERSION = "0.7.10";
 var PROBE_URL = "https://cdn.jsdelivr.net/npm/@libreservice/my-rime@0.10.9/dist/rime.js";
 var INIT_TIMEOUT_MS = 45e3;
 var MAX_TRACE = 60;
 var REPORT_FOLDER = "\u781A\u53F0\u8BCA\u65AD";
 var IME_WARN_COOLDOWN_MS = 30 * 1e3;
+var READY_HINT = "\u781A\u53F0\u8F93\u5165\u6CD5\u5DF2\u5C31\u7EEA\u2014\u2014\u6309 Shift \u5728\u4E2D\u82F1\u6587\u4E4B\u95F4\u5207\u6362";
 var CJK = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/;
 var EMOJI_PAGE = 7;
 function timeout(promise, ms, label) {
@@ -497,6 +498,7 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
     this.shiftArmed = false;
     this.imeConflictStreak = 0;
     this.lastImeWarnAt = 0;
+    this.imeTookOver = false;
     this.traceEnabled = false;
     this.traceRawKeys = false;
   }
@@ -522,7 +524,7 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
       this.ready = true;
       this.updateStatus();
       this.log(`\u5C31\u7EEA\uFF0C\u603B\u8017\u65F6 ${Date.now() - this.startedAt}ms`);
-      new import_obsidian.Notice("\u781A\u53F0\u8F93\u5165\u6CD5\u5DF2\u5C31\u7EEA");
+      new import_obsidian.Notice(READY_HINT);
     } catch (error) {
       const message = this.errorMessage(error);
       this.initError = message;
@@ -600,6 +602,7 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
        两条触发路径共用这一条文案：中文模式下按键被 229 连续跳过，以及任何模式下
        系统输入法上屏了汉字。同一种处境，不该有两种说法。 */
   warnSystemImeTookOver() {
+    this.imeTookOver = true;
     if (Date.now() - this.lastImeWarnAt < IME_WARN_COOLDOWN_MS) return;
     this.lastImeWarnAt = Date.now();
     new import_obsidian.Notice("\u7CFB\u7EDF\u952E\u76D8\u5207\u5230\u4E2D\u6587\u4E86\uFF0C\u781A\u53F0\u5DF2\u505C\u6B62\u5DE5\u4F5C\u2014\u2014\u6309\u952E\u73B0\u5728\u5F52\u7CFB\u7EDF\u8F93\u5165\u6CD5\u3002\u8981\u7EE7\u7EED\u7528\u781A\u53F0\uFF0C\u8BF7\u628A\u7CFB\u7EDF\u952E\u76D8\u5207\u56DE\u82F1\u6587 ABC\u3002", 8e3);
@@ -890,12 +893,26 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
     this.markTrace(this.pendingTrace, "\u8868\u60C5\u76F4\u63A5\u4E0A\u5C4F");
     this.pendingTrace = -1;
   }
+  /* 「砚台停了」有提示，「砚台回来了」也得有，否则用户不知道什么时候能接着用。
+     插件查不到系统输入源，但能从按键反推：系统中文输入法在工作时，按键到达这里
+     是 keyCode 229 / isComposing；一旦有正常字符键落进编辑器，就说明系统交还了
+     控制权。只在确实被接管过之后报一次，平时不啰嗦。 */
+  noteImeReleased(event) {
+    if (!this.imeTookOver) return;
+    if (event.isComposing || event.keyCode === 229) return;
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+    if (event.key.length !== 1) return;
+    if (!this.isEditorTarget(event.target)) return;
+    this.imeTookOver = false;
+    new import_obsidian.Notice(READY_HINT, 6e3);
+  }
   onKeydown(event) {
     this.shiftArmed = event.key === "Shift" && !event.ctrlKey && !event.metaKey && !event.altKey;
     this.keydownSeen += 1;
     const target = event.target instanceof Element ? event.target.className.toString().slice(0, 60) : String(event.target);
     this.lastKeyNote = `key=${this.redactKey(event.key)} code=${this.redactCode(event.code)} keyCode=${this.redactKeyCode(event.keyCode)} isComposing=${event.isComposing} target=[${target}]`;
     this.pendingTrace = this.trace("keydown", `key=${this.redactKey(event.key)} code=${this.redactCode(event.code)} kc=${this.redactKeyCode(event.keyCode)} comp=${event.isComposing} @${this.targetTag(event.target)}`);
+    this.noteImeReleased(event);
     if (this.isPickerChar(event)) {
       this.insertPickerChar(event);
       return;
