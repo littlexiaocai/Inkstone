@@ -1,10 +1,12 @@
 import { App, MarkdownView, Modal, Notice, Platform, Plugin, requestUrl, setIcon } from "obsidian";
 import workerSource from "./vendor/my-rime-worker.txt";
+import { searchEmoji, type EmojiEntry } from "./emoji";
 
-const PLUGIN_VERSION = "0.5.0";
+const PLUGIN_VERSION = "0.6.0";
 const PROBE_URL = "https://cdn.jsdelivr.net/npm/@libreservice/my-rime@0.10.9/dist/rime.js";
 const INIT_TIMEOUT_MS = 45000;
 const MAX_TRACE = 24;
+const EMOJI_PAGE = 7;
 
 type Candidate = { text: string; comment?: string };
 type RimeResult = {
@@ -132,6 +134,16 @@ const KEY_MAP: Record<string, string> = {
 
 const START_PUNCTUATION = new Set([",", ".", "?", "!", ";", ":"]);
 
+type InputMode = "chinese" | "english" | "emoji";
+
+const MODE_ORDER: InputMode[] = ["chinese", "english", "emoji"];
+const MODE_LABEL: Record<InputMode, string> = { chinese: "RIME 中", english: "RIME 英", emoji: "RIME 😀" };
+const MODE_NOTICE: Record<InputMode, string> = {
+  chinese: "中文（系统键盘请用英文 ABC）",
+  english: "英文",
+  emoji: "表情 — 打关键词搜索，如 xiao / smile / huo"
+};
+
 type SkipReason =
   | "未启用"
   | "引擎未就绪"
@@ -183,7 +195,9 @@ class DiagnosticsModal extends Modal {
 
 export default class RimeInputPlugin extends Plugin {
   private client?: RimeWorkerClient;
-  private enabled = true;
+  private mode: InputMode = "chinese";
+  private emojiQuery = "";
+  private emojiHits: EmojiEntry[] = [];
   private ready = false;
   private composing = false;
   private panel?: HTMLDivElement;
@@ -387,7 +401,7 @@ export default class RimeInputPlugin extends Plugin {
       "",
       "--- 当前状态 ---",
       `  引擎就绪 ready = ${this.ready}`,
-      `  中文输入 enabled = ${this.enabled}`,
+      `  输入模式 mode = ${this.mode}`,
       `  组合中 composing = ${this.composing}`,
       `  初始化错误 = ${this.initError ?? "(无)"}`,
       "",
@@ -475,23 +489,31 @@ export default class RimeInputPlugin extends Plugin {
     }
   }
 
+  /* 中 → 英 → 表情 → 中。单独按 Shift、命令面板、状态栏、ribbon 走的都是这里。 */
   private toggle(): void {
-    this.enabled = !this.enabled;
-    if (!this.enabled) this.cancelComposition();
+    const next = MODE_ORDER[(MODE_ORDER.indexOf(this.mode) + 1) % MODE_ORDER.length];
+    this.cancelComposition();
+    this.clearEmoji();
+    this.mode = next;
     this.updateStatus();
-    new Notice(this.enabled ? "RIME 中文输入：开（系统键盘请用英文 ABC）" : "RIME 中文输入：关");
+    if (next === "emoji") {
+      const view = this.activeEditor();
+      if (view) this.renderEmojiPanel(view);
+    }
+    new Notice(`RIME 输入：${MODE_NOTICE[next]}`);
   }
 
   private updateStatus(override?: string): void {
-    const label = override ?? (this.enabled ? "RIME 中" : "RIME 英");
+    const active = this.mode !== "english" && this.ready;
+    const label = override ?? MODE_LABEL[this.mode];
     if (this.status) {
       this.status.setText(label);
-      this.status.toggleClass("is-enabled", this.enabled && this.ready);
+      this.status.toggleClass("is-enabled", active);
     }
     if (this.ribbon) {
-      this.ribbon.toggleClass("is-enabled", this.enabled && this.ready);
-      this.ribbon.setAttribute("aria-label", `RIME 中文输入：${this.enabled ? "开" : "关"}`);
-      setIcon(this.ribbon, this.enabled && this.ready ? "languages" : "type");
+      this.ribbon.toggleClass("is-enabled", active);
+      this.ribbon.setAttribute("aria-label", `RIME 输入：${MODE_NOTICE[this.mode]}`);
+      setIcon(this.ribbon, this.mode === "emoji" ? "smile" : this.mode === "chinese" && this.ready ? "languages" : "type");
     }
   }
 
@@ -517,7 +539,7 @@ export default class RimeInputPlugin extends Plugin {
     // 插件开着、键却被系统输入法吃掉时，沉默看起来就像插件坏了。连续几次就说一声。
     if (reason === "系统输入法组合中") {
       this.imeConflictStreak += 1;
-      if (this.imeConflictStreak === 3 && this.enabled) {
+      if (this.imeConflictStreak === 3 && this.mode === "chinese") {
         new Notice("系统输入法正在接管按键，RIME 收不到输入。请把系统键盘切到英文 ABC。", 8000);
       }
     }
@@ -527,7 +549,7 @@ export default class RimeInputPlugin extends Plugin {
   }
 
   private shouldCapture(event: KeyboardEvent): boolean {
-    if (!this.enabled) return this.skip("未启用");
+    if (this.mode !== "chinese") return this.skip("未启用");
     if (!this.ready || !this.client) return this.skip("引擎未就绪");
     if (!this.isEditorTarget(event.target)) return this.skip("焦点不在编辑器");
     // The system IME is still composing (it was left on a Chinese layout). Letting
@@ -557,6 +579,11 @@ export default class RimeInputPlugin extends Plugin {
     this.lastKeyNote = `key=${this.redactKey(event.key)} code=${this.redactCode(event.code)} keyCode=${this.redactKeyCode(event.keyCode)} isComposing=${event.isComposing} target=[${target}]`;
     this.pendingTrace = this.trace("keydown", `key=${this.redactKey(event.key)} code=${this.redactCode(event.code)} kc=${this.redactKeyCode(event.keyCode)} comp=${event.isComposing}`);
 
+    if (this.mode === "emoji") {
+      this.handleEmojiMode(event);
+      return;
+    }
+
     if (!this.shouldCapture(event)) return;
     const view = this.activeEditor();
     if (!view) return this.skip("焦点不在编辑器") as unknown as void;
@@ -579,6 +606,23 @@ export default class RimeInputPlugin extends Plugin {
         this.cancelComposition();
         new Notice(`RIME 输入失败：${this.errorMessage(error)}`);
       });
+  }
+
+  private handleEmojiMode(event: KeyboardEvent): void {
+    if (!this.isEditorTarget(event.target)) return void this.skip("焦点不在编辑器");
+    if (event.metaKey || event.ctrlKey || event.altKey) return void this.skip("带修饰键");
+    if (event.isComposing || event.keyCode === 229) return void this.skip("系统输入法组合中");
+
+    const view = this.activeEditor();
+    if (!view) return void this.skip("焦点不在编辑器");
+    if (!this.handleEmojiKey(event, view)) return void this.skip("非拼音按键");
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    this.keydownCaptured += 1;
+    this.imeConflictStreak = 0;
+    this.markTrace(this.pendingTrace, "截获");
+    this.pendingTrace = -1;
   }
 
   private toRimeKey(event: KeyboardEvent): string | undefined {
@@ -604,6 +648,85 @@ export default class RimeInputPlugin extends Plugin {
     this.composing = false;
     this.hidePanel();
     if (result.state === 3 && originalKey.length === 1) view.editor.replaceSelection(originalKey);
+  }
+
+  /* ---------------- 表情模式 ---------------- */
+
+  /* 返回 true 表示这个键归表情模式管，调用方负责 preventDefault。
+     查询为空时只吃字母，其余键一律放行，免得表情模式下连空格退格都动不了。 */
+  private handleEmojiKey(event: KeyboardEvent, view: MarkdownView): boolean {
+    const key = event.key;
+
+    if (/^[a-z]$/i.test(key)) {
+      this.emojiQuery += key.toLowerCase();
+      this.renderEmojiPanel(view);
+      return true;
+    }
+
+    if (key === "Backspace") {
+      if (!this.emojiQuery) return false;
+      this.emojiQuery = this.emojiQuery.slice(0, -1);
+      this.renderEmojiPanel(view);
+      return true;
+    }
+
+    if (!this.emojiQuery) return false;
+
+    if (key === "Escape") {
+      this.clearEmoji();
+      return true;
+    }
+
+    if (key === " ") {
+      this.commitEmoji(0, view);
+      return true;
+    }
+
+    if (/^[1-9]$/.test(key)) {
+      this.commitEmoji(Number(key) - 1, view);
+      return true;
+    }
+
+    return false;
+  }
+
+  private commitEmoji(index: number, view: MarkdownView): void {
+    const hit = this.emojiHits[index];
+    if (!hit) return;
+    view.editor.replaceSelection(hit.e);
+    this.emojiQuery = "";
+    this.renderEmojiPanel(view);
+  }
+
+  private clearEmoji(): void {
+    this.emojiQuery = "";
+    this.emojiHits = [];
+    this.hidePanel();
+  }
+
+  private renderEmojiPanel(view: MarkdownView): void {
+    if (!this.panel || !this.preedit || !this.candidates) return;
+    this.emojiHits = searchEmoji(this.emojiQuery, EMOJI_PAGE);
+
+    this.preedit.setText(this.emojiQuery ? `😀 ${this.emojiQuery}` : "😀 打关键词搜索表情（xiao / smile / huo）");
+    this.candidates.empty();
+
+    if (!this.emojiHits.length) {
+      this.candidates.createEl("button", { text: "没有匹配的表情", attr: { type: "button", disabled: "true" } });
+    }
+
+    this.emojiHits.forEach((hit, index) => {
+      const button = this.candidates!.createEl("button", {
+        cls: index === 0 ? "is-highlighted" : "",
+        text: `${index + 1} ${hit.e}`,
+        attr: { type: "button" }
+      });
+      button.addEventListener("pointerdown", (event) => event.preventDefault());
+      button.addEventListener("click", () => this.commitEmoji(index, view));
+    });
+
+    this.positionPanel(view);
+    this.panel.addClass("is-visible");
   }
 
   /* 候选栏跟随光标。取不到光标位置时退回底部居中。 */
