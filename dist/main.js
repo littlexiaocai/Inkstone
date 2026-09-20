@@ -332,7 +332,7 @@ function searchEmoji(query, limit) {
 }
 
 // src/main.ts
-var PLUGIN_VERSION = "0.7.5";
+var PLUGIN_VERSION = "0.7.6";
 var PROBE_URL = "https://cdn.jsdelivr.net/npm/@libreservice/my-rime@0.10.9/dist/rime.js";
 var INIT_TIMEOUT_MS = 45e3;
 var MAX_TRACE = 60;
@@ -704,23 +704,23 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
   registerCommands() {
     this.addCommand({
       id: "toggle-chinese-english",
-      name: "\u5207\u6362\u4E2D\u82F1\u6587",
+      name: "\u5207\u6362\u4E2D\u82F1\u6587 (toggle)",
       hotkeys: [{ modifiers: ["Mod", "Shift"], key: "Space" }],
       callback: () => this.toggle()
     });
     this.addCommand({
       id: "toggle-emoji",
-      name: "\u5207\u6362\u8868\u60C5\u6A21\u5F0F",
+      name: "\u5207\u6362\u8868\u60C5\u6A21\u5F0F (emoji)",
       callback: () => this.toggleEmoji()
     });
     this.addCommand({
       id: "diagnostics",
-      name: "\u8BCA\u65AD\u62A5\u544A",
+      name: "\u8BCA\u65AD\u62A5\u544A (report)",
       callback: () => new DiagnosticsModal(this.app, this.buildReport(), this.traceRawKeys).open()
     });
     this.addCommand({
       id: "toggle-trace",
-      name: "\u8BCA\u65AD\uFF1A\u5F00\u59CB/\u505C\u6B62\u8BB0\u5F55\u6309\u952E\u4E8B\u4EF6",
+      name: "\u8BCA\u65AD\uFF1A\u5F00\u59CB/\u505C\u6B62\u8BB0\u5F55\u6309\u952E\u4E8B\u4EF6 (trace)",
       callback: () => {
         this.traceEnabled = !this.traceEnabled;
         if (this.traceEnabled) {
@@ -734,7 +734,7 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
     });
     this.addCommand({
       id: "toggle-trace-raw",
-      name: "\u8BCA\u65AD\uFF1A\u8BB0\u5F55\u539F\u59CB\u6309\u952E\u5185\u5BB9\uFF08\u654F\u611F\uFF09",
+      name: "\u8BCA\u65AD\uFF1A\u8BB0\u5F55\u539F\u59CB\u6309\u952E\u5185\u5BB9 \u654F\u611F (trace raw)",
       callback: () => {
         this.traceRawKeys = !this.traceRawKeys;
         if (this.traceRawKeys && !this.traceEnabled) {
@@ -747,12 +747,12 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
     });
     this.addCommand({
       id: "save-report",
-      name: "\u8BCA\u65AD\uFF1A\u628A\u62A5\u544A\u5B58\u8FDB Vault\uFF08\u53EF\u540C\u6B65\u5230\u7535\u8111\u6392\u67E5\uFF09",
+      name: "\u8BCA\u65AD\uFF1A\u628A\u62A5\u544A\u5B58\u8FDB Vault (save report)",
       callback: () => void this.saveReport()
     });
     this.addCommand({
       id: "probe-network",
-      name: "\u8BCA\u65AD\uFF1A\u7F51\u7EDC\u63A2\u6D4B",
+      name: "\u8BCA\u65AD\uFF1A\u7F51\u7EDC\u63A2\u6D4B (network)",
       callback: () => {
         void this.probeNetwork().then(() => new DiagnosticsModal(this.app, this.buildReport(), this.traceRawKeys).open());
       }
