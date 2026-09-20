@@ -332,7 +332,7 @@ function searchEmoji(query, limit) {
 }
 
 // src/main.ts
-var PLUGIN_VERSION = "0.7.8";
+var PLUGIN_VERSION = "0.7.9";
 var PROBE_URL = "https://cdn.jsdelivr.net/npm/@libreservice/my-rime@0.10.9/dist/rime.js";
 var INIT_TIMEOUT_MS = 45e3;
 var MAX_TRACE = 60;
@@ -434,7 +434,7 @@ var KEY_MAP = {
 var START_PUNCTUATION = /* @__PURE__ */ new Set([",", ".", "?", "!", ";", ":"]);
 var MODE_LABEL = { chinese: "\u781A\u53F0 \u4E2D", english: "\u781A\u53F0 \u82F1", emoji: "\u781A\u53F0 \u{1F600}" };
 var MODE_NOTICE = {
-  chinese: "\u4E2D\u6587\uFF08\u7CFB\u7EDF\u952E\u76D8\u8BF7\u7528\u82F1\u6587 ABC\uFF09",
+  chinese: "\u4E2D\u6587",
   english: "\u82F1\u6587",
   emoji: "\u8868\u60C5 \u2014 \u6253\u5173\u952E\u8BCD\u641C\u7D22\uFF0C\u5982 xiao / smile / huo\u3002\u6309 Shift \u56DE\u4E2D\u6587"
 };
@@ -522,7 +522,7 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
       this.ready = true;
       this.updateStatus();
       this.log(`\u5C31\u7EEA\uFF0C\u603B\u8017\u65F6 ${Date.now() - this.startedAt}ms`);
-      new import_obsidian.Notice("\u781A\u53F0\u8F93\u5165\u6CD5\u5DF2\u5C31\u7EEA\uFF1B\u8BF7\u628A\u7CFB\u7EDF\u952E\u76D8\u5207\u5230\u82F1\u6587 ABC");
+      new import_obsidian.Notice("\u781A\u53F0\u8F93\u5165\u6CD5\u5DF2\u5C31\u7EEA");
     } catch (error) {
       const message = this.errorMessage(error);
       this.initError = message;
@@ -530,7 +530,7 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
       console.error("RIME initialization failed", error);
       this.updateStatus("\u52A0\u8F7D\u5931\u8D25");
       new import_obsidian.Notice(`\u781A\u53F0\u52A0\u8F7D\u5931\u8D25\uFF1A${message}
-\u8BF7\u8FD0\u884C\u547D\u4EE4\u300C\u781A\u53F0\u8F93\u5165\u6CD5\uFF1A\u8BCA\u65AD\u62A5\u544A\u300D\u67E5\u770B\u8BE6\u60C5`, 15e3);
+\u8FD0\u884C\u547D\u4EE4\u300C\u8BCA\u65AD\u62A5\u544A (report)\u300D\u67E5\u770B\u8BE6\u60C5`, 15e3);
     }
   }
   onunload() {
@@ -591,10 +591,18 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
   noteSystemIme(event) {
     if (event.type !== "compositionend") return;
     if (!CJK.test(event.data ?? "")) return;
-    if (this.mode !== "english") return;
+    this.warnSystemImeTookOver();
+  }
+  /* 系统键盘切到中文时，砚台在任何模式下都不工作——按键在到达插件之前就被系统
+       输入法吃掉了。所以话要说「砚台停了」，不是「你在某某模式」：用户需要知道的是
+       工具还灵不灵，不是自己处在哪一档。
+  
+       两条触发路径共用这一条文案：中文模式下按键被 229 连续跳过，以及任何模式下
+       系统输入法上屏了汉字。同一种处境，不该有两种说法。 */
+  warnSystemImeTookOver() {
     if (Date.now() - this.lastImeWarnAt < IME_WARN_COOLDOWN_MS) return;
     this.lastImeWarnAt = Date.now();
-    new import_obsidian.Notice("\u4F60\u5728\u82F1\u6587\u6A21\u5F0F\uFF0C\u4F46\u7CFB\u7EDF\u952E\u76D8\u6B63\u7528\u4E2D\u6587\u8F93\u5165\u6CD5\u8F6C\u6362\u3002\u6309 Ctrl+\u7A7A\u683C \u6216\u5730\u7403\u952E\uFF0C\u628A\u7CFB\u7EDF\u952E\u76D8\u5207\u5230\u82F1\u6587 ABC\u3002", 8e3);
+    new import_obsidian.Notice("\u7CFB\u7EDF\u952E\u76D8\u5207\u5230\u4E2D\u6587\u4E86\uFF0C\u781A\u53F0\u5DF2\u505C\u6B62\u5DE5\u4F5C\u2014\u2014\u6309\u952E\u73B0\u5728\u5F52\u7CFB\u7EDF\u8F93\u5165\u6CD5\u3002\u8981\u7EE7\u7EED\u7528\u781A\u53F0\uFF0C\u8BF7\u628A\u7CFB\u7EDF\u952E\u76D8\u5207\u56DE\u82F1\u6587 ABC\u3002", 8e3);
   }
   describeEvent(event) {
     const input = event;
@@ -738,7 +746,7 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
         } else {
           this.traceRawKeys = false;
         }
-        new import_obsidian.Notice(this.traceEnabled ? "\u6309\u952E\u4E8B\u4EF6\u8BB0\u5F55\uFF1A\u5F00\uFF08\u5185\u5BB9\u5DF2\u8131\u654F\uFF09\u3002\u590D\u73B0\u95EE\u9898\u540E\u8FD0\u884C\u300C\u8BCA\u65AD\u62A5\u544A\u300D\u3002" : "\u6309\u952E\u4E8B\u4EF6\u8BB0\u5F55\uFF1A\u5173\u3002");
+        new import_obsidian.Notice(this.traceEnabled ? "\u6309\u952E\u4E8B\u4EF6\u8BB0\u5F55\uFF1A\u5F00\uFF08\u5185\u5BB9\u5DF2\u8131\u654F\uFF09\u3002\u590D\u73B0\u95EE\u9898\u540E\u8FD0\u884C\u300C\u8BCA\u65AD\u62A5\u544A (report)\u300D\u3002" : "\u6309\u952E\u4E8B\u4EF6\u8BB0\u5F55\uFF1A\u5173\u3002");
       }
     });
     this.addCommand({
@@ -826,7 +834,7 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
     if (reason === "\u7CFB\u7EDF\u8F93\u5165\u6CD5\u7EC4\u5408\u4E2D") {
       this.imeConflictStreak += 1;
       if (this.imeConflictStreak === 3 && this.mode === "chinese") {
-        new import_obsidian.Notice("\u7CFB\u7EDF\u8F93\u5165\u6CD5\u6B63\u5728\u63A5\u7BA1\u6309\u952E\uFF0C\u781A\u53F0\u6536\u4E0D\u5230\u8F93\u5165\u3002\u8BF7\u628A\u7CFB\u7EDF\u952E\u76D8\u5207\u5230\u82F1\u6587 ABC\u3002", 8e3);
+        this.warnSystemImeTookOver();
       }
     }
     this.markTrace(this.pendingTrace, reason);
@@ -912,7 +920,8 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
       console.error("RIME input failed", error);
       this.log(`process("${rimeKey}") \u5931\u8D25\uFF1A${this.errorMessage(error)}`);
       this.cancelComposition();
-      new import_obsidian.Notice(`\u781A\u53F0\u8F93\u5165\u5931\u8D25\uFF1A${this.errorMessage(error)}`);
+      new import_obsidian.Notice(`\u781A\u53F0\u8F93\u5165\u5931\u8D25\uFF1A${this.errorMessage(error)}
+\u53EF\u8FD0\u884C\u547D\u4EE4\u300C\u8BCA\u65AD\u62A5\u544A (report)\u300D\u67E5\u770B\u8BE6\u60C5`, 8e3);
     });
   }
   handleEmojiMode(event) {

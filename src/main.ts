@@ -2,7 +2,7 @@ import { App, MarkdownView, Modal, Notice, Platform, Plugin, requestUrl, setIcon
 import workerSource from "./vendor/my-rime-worker.txt";
 import { searchEmoji, type EmojiEntry } from "./emoji";
 
-const PLUGIN_VERSION = "0.7.8";
+const PLUGIN_VERSION = "0.7.9";
 const PROBE_URL = "https://cdn.jsdelivr.net/npm/@libreservice/my-rime@0.10.9/dist/rime.js";
 const INIT_TIMEOUT_MS = 45000;
 const MAX_TRACE = 60;
@@ -142,7 +142,7 @@ type InputMode = "chinese" | "english" | "emoji";
 
 const MODE_LABEL: Record<InputMode, string> = { chinese: "砚台 中", english: "砚台 英", emoji: "砚台 😀" };
 const MODE_NOTICE: Record<InputMode, string> = {
-  chinese: "中文（系统键盘请用英文 ABC）",
+  chinese: "中文",
   english: "英文",
   emoji: "表情 — 打关键词搜索，如 xiao / smile / huo。按 Shift 回中文"
 };
@@ -254,14 +254,14 @@ export default class InkstonePlugin extends Plugin {
       this.ready = true;
       this.updateStatus();
       this.log(`就绪，总耗时 ${Date.now() - this.startedAt}ms`);
-      new Notice("砚台输入法已就绪；请把系统键盘切到英文 ABC");
+      new Notice("砚台输入法已就绪");
     } catch (error) {
       const message = this.errorMessage(error);
       this.initError = message;
       this.log(`初始化失败：${message}`);
       console.error("RIME initialization failed", error);
       this.updateStatus("加载失败");
-      new Notice(`砚台加载失败：${message}\n请运行命令「砚台输入法：诊断报告」查看详情`, 15000);
+      new Notice(`砚台加载失败：${message}\n运行命令「诊断报告 (report)」查看详情`, 15000);
     }
   }
 
@@ -334,10 +334,19 @@ export default class InkstonePlugin extends Plugin {
   private noteSystemIme(event: Event): void {
     if (event.type !== "compositionend") return;
     if (!CJK.test((event as CompositionEvent).data ?? "")) return;
-    if (this.mode !== "english") return;
+    this.warnSystemImeTookOver();
+  }
+
+  /* 系统键盘切到中文时，砚台在任何模式下都不工作——按键在到达插件之前就被系统
+     输入法吃掉了。所以话要说「砚台停了」，不是「你在某某模式」：用户需要知道的是
+     工具还灵不灵，不是自己处在哪一档。
+
+     两条触发路径共用这一条文案：中文模式下按键被 229 连续跳过，以及任何模式下
+     系统输入法上屏了汉字。同一种处境，不该有两种说法。 */
+  private warnSystemImeTookOver(): void {
     if (Date.now() - this.lastImeWarnAt < IME_WARN_COOLDOWN_MS) return;
     this.lastImeWarnAt = Date.now();
-    new Notice("你在英文模式，但系统键盘正用中文输入法转换。按 Ctrl+空格 或地球键，把系统键盘切到英文 ABC。", 8000);
+    new Notice("系统键盘切到中文了，砚台已停止工作——按键现在归系统输入法。要继续用砚台，请把系统键盘切回英文 ABC。", 8000);
   }
 
   private describeEvent(event: Event): string {
@@ -510,7 +519,7 @@ export default class InkstonePlugin extends Plugin {
           this.traceRawKeys = false;
         }
         new Notice(this.traceEnabled
-          ? "按键事件记录：开（内容已脱敏）。复现问题后运行「诊断报告」。"
+          ? "按键事件记录：开（内容已脱敏）。复现问题后运行「诊断报告 (report)」。"
           : "按键事件记录：关。");
       }
     });
@@ -614,7 +623,7 @@ export default class InkstonePlugin extends Plugin {
     if (reason === "系统输入法组合中") {
       this.imeConflictStreak += 1;
       if (this.imeConflictStreak === 3 && this.mode === "chinese") {
-        new Notice("系统输入法正在接管按键，砚台收不到输入。请把系统键盘切到英文 ABC。", 8000);
+        this.warnSystemImeTookOver();
       }
     }
     this.markTrace(this.pendingTrace, reason);
@@ -716,7 +725,7 @@ export default class InkstonePlugin extends Plugin {
         console.error("RIME input failed", error);
         this.log(`process("${rimeKey}") 失败：${this.errorMessage(error)}`);
         this.cancelComposition();
-        new Notice(`砚台输入失败：${this.errorMessage(error)}`);
+        new Notice(`砚台输入失败：${this.errorMessage(error)}\n可运行命令「诊断报告 (report)」查看详情`, 8000);
       });
   }
 
