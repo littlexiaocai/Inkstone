@@ -332,7 +332,7 @@ function searchEmoji(query, limit) {
 }
 
 // src/main.ts
-var PLUGIN_VERSION = "0.7.2";
+var PLUGIN_VERSION = "0.7.3";
 var PROBE_URL = "https://cdn.jsdelivr.net/npm/@libreservice/my-rime@0.10.9/dist/rime.js";
 var INIT_TIMEOUT_MS = 45e3;
 var MAX_TRACE = 24;
@@ -432,12 +432,11 @@ var KEY_MAP = {
   "'": "apostrophe"
 };
 var START_PUNCTUATION = /* @__PURE__ */ new Set([",", ".", "?", "!", ";", ":"]);
-var MODE_ORDER = ["chinese", "english", "emoji"];
 var MODE_LABEL = { chinese: "\u781A\u53F0 \u4E2D", english: "\u781A\u53F0 \u82F1", emoji: "\u781A\u53F0 \u{1F600}" };
 var MODE_NOTICE = {
   chinese: "\u4E2D\u6587\uFF08\u7CFB\u7EDF\u952E\u76D8\u8BF7\u7528\u82F1\u6587 ABC\uFF09",
   english: "\u82F1\u6587",
-  emoji: "\u8868\u60C5 \u2014 \u6253\u5173\u952E\u8BCD\u641C\u7D22\uFF0C\u5982 xiao / smile / huo"
+  emoji: "\u8868\u60C5 \u2014 \u6253\u5173\u952E\u8BCD\u641C\u7D22\uFF0C\u5982 xiao / smile / huo\u3002\u6309 Shift \u56DE\u4E2D\u6587"
 };
 var DiagnosticsModal = class extends import_obsidian.Modal {
   constructor(app, report, sensitive = false) {
@@ -697,10 +696,15 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
   /* ---------------- UI ---------------- */
   registerCommands() {
     this.addCommand({
-      id: "toggle-input-mode",
-      name: "\u5207\u6362\u8F93\u5165\u6A21\u5F0F\uFF08\u4E2D / \u82F1 / \u8868\u60C5\uFF09",
+      id: "toggle-chinese-english",
+      name: "\u5207\u6362\u4E2D\u82F1\u6587",
       hotkeys: [{ modifiers: ["Mod", "Shift"], key: "Space" }],
       callback: () => this.toggle()
+    });
+    this.addCommand({
+      id: "toggle-emoji",
+      name: "\u5207\u6362\u8868\u60C5\u6A21\u5F0F",
+      callback: () => this.toggleEmoji()
     });
     this.addCommand({
       id: "diagnostics",
@@ -748,16 +752,23 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
     });
   }
   createControls() {
-    this.ribbon = this.addRibbonIcon("languages", "\u781A\u53F0\uFF1A\u5207\u6362\u8F93\u5165\u6A21\u5F0F", () => this.toggle());
+    this.ribbon = this.addRibbonIcon("languages", "\u781A\u53F0\uFF1A\u5207\u6362\u4E2D\u82F1\u6587", () => this.toggle());
     if (!import_obsidian.Platform.isMobile) {
       this.status = this.addStatusBarItem();
       this.status.addClass("inkstone-status");
       this.status.addEventListener("click", () => this.toggle());
     }
   }
-  /* 中 → 英 → 表情 → 中。单独按 Shift、命令面板、状态栏、ribbon 走的都是这里。 */
+  /* Shift、状态栏、ribbon 都只管中/英——和其他输入法的习惯一致。
+     在表情模式下按 Shift 直接回中文，规则简单，不用记之前在哪。
+     表情模式改由独立命令进入：iPad 上用系统地球键更顺手，这条留作后路。 */
   toggle() {
-    const next = MODE_ORDER[(MODE_ORDER.indexOf(this.mode) + 1) % MODE_ORDER.length];
+    this.setMode(this.mode === "chinese" ? "english" : "chinese");
+  }
+  toggleEmoji() {
+    this.setMode(this.mode === "emoji" ? "chinese" : "emoji");
+  }
+  setMode(next) {
     this.cancelComposition();
     this.clearEmoji();
     this.mode = next;

@@ -2,7 +2,7 @@ import { App, MarkdownView, Modal, Notice, Platform, Plugin, requestUrl, setIcon
 import workerSource from "./vendor/my-rime-worker.txt";
 import { searchEmoji, type EmojiEntry } from "./emoji";
 
-const PLUGIN_VERSION = "0.7.2";
+const PLUGIN_VERSION = "0.7.3";
 const PROBE_URL = "https://cdn.jsdelivr.net/npm/@libreservice/my-rime@0.10.9/dist/rime.js";
 const INIT_TIMEOUT_MS = 45000;
 const MAX_TRACE = 24;
@@ -140,12 +140,11 @@ const START_PUNCTUATION = new Set([",", ".", "?", "!", ";", ":"]);
 
 type InputMode = "chinese" | "english" | "emoji";
 
-const MODE_ORDER: InputMode[] = ["chinese", "english", "emoji"];
 const MODE_LABEL: Record<InputMode, string> = { chinese: "砚台 中", english: "砚台 英", emoji: "砚台 😀" };
 const MODE_NOTICE: Record<InputMode, string> = {
   chinese: "中文（系统键盘请用英文 ABC）",
   english: "英文",
-  emoji: "表情 — 打关键词搜索，如 xiao / smile / huo"
+  emoji: "表情 — 打关键词搜索，如 xiao / smile / huo。按 Shift 回中文"
 };
 
 type SkipReason =
@@ -467,10 +466,15 @@ export default class InkstonePlugin extends Plugin {
 
   private registerCommands(): void {
     this.addCommand({
-      id: "toggle-input-mode",
-      name: "切换输入模式（中 / 英 / 表情）",
+      id: "toggle-chinese-english",
+      name: "切换中英文",
       hotkeys: [{ modifiers: ["Mod", "Shift"], key: "Space" }],
       callback: () => this.toggle()
+    });
+    this.addCommand({
+      id: "toggle-emoji",
+      name: "切换表情模式",
+      callback: () => this.toggleEmoji()
     });
     this.addCommand({
       id: "diagnostics",
@@ -525,7 +529,7 @@ export default class InkstonePlugin extends Plugin {
 
   private createControls(): void {
     // Obsidian mobile has no status bar, so the ribbon carries the state there.
-    this.ribbon = this.addRibbonIcon("languages", "砚台：切换输入模式", () => this.toggle());
+    this.ribbon = this.addRibbonIcon("languages", "砚台：切换中英文", () => this.toggle());
     if (!Platform.isMobile) {
       this.status = this.addStatusBarItem();
       this.status.addClass("inkstone-status");
@@ -533,9 +537,18 @@ export default class InkstonePlugin extends Plugin {
     }
   }
 
-  /* 中 → 英 → 表情 → 中。单独按 Shift、命令面板、状态栏、ribbon 走的都是这里。 */
+  /* Shift、状态栏、ribbon 都只管中/英——和其他输入法的习惯一致。
+     在表情模式下按 Shift 直接回中文，规则简单，不用记之前在哪。
+     表情模式改由独立命令进入：iPad 上用系统地球键更顺手，这条留作后路。 */
   private toggle(): void {
-    const next = MODE_ORDER[(MODE_ORDER.indexOf(this.mode) + 1) % MODE_ORDER.length];
+    this.setMode(this.mode === "chinese" ? "english" : "chinese");
+  }
+
+  private toggleEmoji(): void {
+    this.setMode(this.mode === "emoji" ? "chinese" : "emoji");
+  }
+
+  private setMode(next: InputMode): void {
     this.cancelComposition();
     this.clearEmoji();
     this.mode = next;
