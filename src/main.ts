@@ -2,10 +2,10 @@ import { App, MarkdownView, Modal, Notice, Platform, Plugin, requestUrl, setIcon
 import workerSource from "./vendor/my-rime-worker.txt";
 import { searchEmoji, type EmojiEntry } from "./emoji";
 
-const PLUGIN_VERSION = "0.7.4";
+const PLUGIN_VERSION = "0.7.5";
 const PROBE_URL = "https://cdn.jsdelivr.net/npm/@libreservice/my-rime@0.10.9/dist/rime.js";
 const INIT_TIMEOUT_MS = 45000;
-const MAX_TRACE = 24;
+const MAX_TRACE = 60;
 const REPORT_FOLDER = "砚台诊断";
 // 同一条提醒的最短间隔，以及「系统输入法刚才在工作」这条证据的有效期。
 const IME_WARN_COOLDOWN_MS = 30 * 1000;
