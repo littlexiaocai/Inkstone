@@ -2,7 +2,7 @@ import { App, MarkdownView, Modal, Notice, Platform, Plugin, requestUrl, setIcon
 import workerSource from "./vendor/my-rime-worker.txt";
 import { searchEmoji, type EmojiEntry } from "./emoji";
 
-const PLUGIN_VERSION = "0.7.3";
+const PLUGIN_VERSION = "0.7.4";
 const PROBE_URL = "https://cdn.jsdelivr.net/npm/@libreservice/my-rime@0.10.9/dist/rime.js";
 const INIT_TIMEOUT_MS = 45000;
 const MAX_TRACE = 24;
@@ -10,6 +10,7 @@ const REPORT_FOLDER = "砚台诊断";
 // 同一条提醒的最短间隔，以及「系统输入法刚才在工作」这条证据的有效期。
 const IME_WARN_COOLDOWN_MS = 30 * 1000;
 const IME_EVIDENCE_TTL_MS = 10 * 60 * 1000;
+const CJK = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/;
 const EMOJI_PAGE = 7;
 
 type Candidate = { text: string; comment?: string };
@@ -320,11 +321,17 @@ export default class InkstonePlugin extends Plugin {
   }
 
   /* 英文模式下砚台完全放行按键，打出中文还是英文取决于系统输入源。插件查不到
-     系统输入源（网页环境没有这个 API），但系统中文输入法一工作就会发 composition
-     事件——这是直接证据，不是推测。 */
+     系统输入源（网页环境没有这个 API），只能从事件反推。
+
+     注意：不能拿「有 composition 事件」当判据。macOS 上那确实意味着输入法在转换，
+     但 iOS 的自动改正和预测输入在打普通英文时也走 composition，照那么判会在英文
+     键盘下疯狂误报（0.7.2 就是这么错的）。
+
+     真正可靠的判据是 compositionend 提交了汉字：自动改正提交的是 ASCII，中文输入
+     法提交的是汉字。代价是提醒要等到第一个词上屏之后才出现，可以接受。 */
   private noteSystemIme(event: Event): void {
-    const composing = event.type.startsWith("composition") || (event as InputEvent).isComposing === true;
-    if (!composing) return;
+    if (event.type !== "compositionend") return;
+    if (!CJK.test((event as CompositionEvent).data ?? "")) return;
     this.lastSystemImeAt = Date.now();
     if (this.mode !== "english") return;
     if (Date.now() - this.lastImeWarnAt < IME_WARN_COOLDOWN_MS) return;

@@ -332,13 +332,14 @@ function searchEmoji(query, limit) {
 }
 
 // src/main.ts
-var PLUGIN_VERSION = "0.7.3";
+var PLUGIN_VERSION = "0.7.4";
 var PROBE_URL = "https://cdn.jsdelivr.net/npm/@libreservice/my-rime@0.10.9/dist/rime.js";
 var INIT_TIMEOUT_MS = 45e3;
 var MAX_TRACE = 24;
 var REPORT_FOLDER = "\u781A\u53F0\u8BCA\u65AD";
 var IME_WARN_COOLDOWN_MS = 30 * 1e3;
 var IME_EVIDENCE_TTL_MS = 10 * 60 * 1e3;
+var CJK = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/;
 var EMOJI_PAGE = 7;
 function timeout(promise, ms, label) {
   return new Promise((resolve, reject) => {
@@ -577,11 +578,17 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
     }
   }
   /* 英文模式下砚台完全放行按键，打出中文还是英文取决于系统输入源。插件查不到
-     系统输入源（网页环境没有这个 API），但系统中文输入法一工作就会发 composition
-     事件——这是直接证据，不是推测。 */
+       系统输入源（网页环境没有这个 API），只能从事件反推。
+  
+       注意：不能拿「有 composition 事件」当判据。macOS 上那确实意味着输入法在转换，
+       但 iOS 的自动改正和预测输入在打普通英文时也走 composition，照那么判会在英文
+       键盘下疯狂误报（0.7.2 就是这么错的）。
+  
+       真正可靠的判据是 compositionend 提交了汉字：自动改正提交的是 ASCII，中文输入
+       法提交的是汉字。代价是提醒要等到第一个词上屏之后才出现，可以接受。 */
   noteSystemIme(event) {
-    const composing = event.type.startsWith("composition") || event.isComposing === true;
-    if (!composing) return;
+    if (event.type !== "compositionend") return;
+    if (!CJK.test(event.data ?? "")) return;
     this.lastSystemImeAt = Date.now();
     if (this.mode !== "english") return;
     if (Date.now() - this.lastImeWarnAt < IME_WARN_COOLDOWN_MS) return;
