@@ -1,9 +1,10 @@
 {
-  "id": "rime-input",
-  "name": "RIME 中文输入",
-  "version": "0.6.0",
+  "id": "inkstone",
+  "name": "砚台输入法",
+  "version": "0.7.0",
   "minAppVersion": "1.5.0",
-  "description": "在 Obsidian 编辑器内使用独立的 RIME 拼音引擎输入中文，绕开系统中文输入法的延迟。",
-  "author": "Codex + Claude for littlexiaocai",
+  "description": "在 Obsidian 编辑器内直接输入中文与表情，绕开系统中文输入法的延迟。引擎基于 RIME。",
+  "author": "littlexiaocai",
+  "authorUrl": "https://github.com/littlexiaocai/Inkstone",
   "isDesktopOnly": false
 }

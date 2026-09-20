@@ -2,7 +2,7 @@ import { App, MarkdownView, Modal, Notice, Platform, Plugin, requestUrl, setIcon
 import workerSource from "./vendor/my-rime-worker.txt";
 import { searchEmoji, type EmojiEntry } from "./emoji";
 
-const PLUGIN_VERSION = "0.6.0";
+const PLUGIN_VERSION = "0.7.0";
 const PROBE_URL = "https://cdn.jsdelivr.net/npm/@libreservice/my-rime@0.10.9/dist/rime.js";
 const INIT_TIMEOUT_MS = 45000;
 const MAX_TRACE = 24;
@@ -137,7 +137,7 @@ const START_PUNCTUATION = new Set([",", ".", "?", "!", ";", ":"]);
 type InputMode = "chinese" | "english" | "emoji";
 
 const MODE_ORDER: InputMode[] = ["chinese", "english", "emoji"];
-const MODE_LABEL: Record<InputMode, string> = { chinese: "RIME 中", english: "RIME 英", emoji: "RIME 😀" };
+const MODE_LABEL: Record<InputMode, string> = { chinese: "砚台 中", english: "砚台 英", emoji: "砚台 😀" };
 const MODE_NOTICE: Record<InputMode, string> = {
   chinese: "中文（系统键盘请用英文 ABC）",
   english: "英文",
@@ -159,20 +159,20 @@ class DiagnosticsModal extends Modal {
 
   onOpen(): void {
     const { contentEl } = this;
-    contentEl.addClass("rime-diag");
-    contentEl.createEl("h3", { text: "RIME 输入 · 诊断报告" });
+    contentEl.addClass("inkstone-diag");
+    contentEl.createEl("h3", { text: "砚台输入法 · 诊断报告" });
     contentEl.createEl("p", {
-      cls: "rime-diag-hint",
+      cls: "inkstone-diag-hint",
       text: this.sensitive
         ? "⚠️ 本次记录包含你实际敲下的按键内容。外发前请先通读一遍。"
         : "可以把这份报告发给协助排查的人。按键内容已脱敏，只保留类别（字母/数字/符号）。"
     });
-    const area = contentEl.createEl("textarea", { cls: "rime-diag-text" });
+    const area = contentEl.createEl("textarea", { cls: "inkstone-diag-text" });
     area.value = this.report;
     area.readOnly = true;
     area.rows = 18;
 
-    const actions = contentEl.createDiv({ cls: "rime-diag-actions" });
+    const actions = contentEl.createDiv({ cls: "inkstone-diag-actions" });
     const copyButton = actions.createEl("button", { text: "复制报告", cls: "mod-cta" });
     copyButton.addEventListener("click", async () => {
       try {
@@ -193,7 +193,7 @@ class DiagnosticsModal extends Modal {
   }
 }
 
-export default class RimeInputPlugin extends Plugin {
+export default class InkstonePlugin extends Plugin {
   private client?: RimeWorkerClient;
   private mode: InputMode = "chinese";
   private emojiQuery = "";
@@ -250,14 +250,14 @@ export default class RimeInputPlugin extends Plugin {
       this.ready = true;
       this.updateStatus();
       this.log(`就绪，总耗时 ${Date.now() - this.startedAt}ms`);
-      new Notice("RIME 中文输入已就绪；请把系统键盘切到英文 ABC");
+      new Notice("砚台输入法已就绪；请把系统键盘切到英文 ABC");
     } catch (error) {
       const message = this.errorMessage(error);
       this.initError = message;
       this.log(`初始化失败：${message}`);
       console.error("RIME initialization failed", error);
       this.updateStatus("加载失败");
-      new Notice(`RIME 加载失败：${message}\n请运行命令「RIME 输入：诊断报告」查看详情`, 15000);
+      new Notice(`砚台加载失败：${message}\n请运行命令「砚台输入法：诊断报告」查看详情`, 15000);
     }
   }
 
@@ -393,7 +393,7 @@ export default class RimeInputPlugin extends Plugin {
       : "  (无)";
 
     return [
-      "RIME 输入 · 诊断报告",
+      "砚台输入法 · 诊断报告",
       `生成时间：${new Date().toLocaleString()}`,
       `插件版本：${PLUGIN_VERSION}`,
       this.environmentLine(),
@@ -407,7 +407,7 @@ export default class RimeInputPlugin extends Plugin {
       "",
       "--- 按键捕获 ---",
       `  收到 keydown：${this.keydownSeen}`,
-      `  被 RIME 截获：${this.keydownCaptured}`,
+      `  被砚台截获：${this.keydownCaptured}`,
       `  最近一次按键：${this.lastKeyNote}`,
       "  未截获原因统计：",
       skips,
@@ -428,18 +428,18 @@ export default class RimeInputPlugin extends Plugin {
 
   private registerCommands(): void {
     this.addCommand({
-      id: "toggle-rime-input",
-      name: "切换 RIME 中文输入",
+      id: "toggle-input-mode",
+      name: "切换输入模式（中 / 英 / 表情）",
       hotkeys: [{ modifiers: ["Mod", "Shift"], key: "Space" }],
       callback: () => this.toggle()
     });
     this.addCommand({
-      id: "rime-diagnostics",
+      id: "diagnostics",
       name: "诊断报告",
       callback: () => new DiagnosticsModal(this.app, this.buildReport(), this.traceRawKeys).open()
     });
     this.addCommand({
-      id: "rime-toggle-trace",
+      id: "toggle-trace",
       name: "诊断：开始/停止记录按键事件",
       callback: () => {
         this.traceEnabled = !this.traceEnabled;
@@ -455,7 +455,7 @@ export default class RimeInputPlugin extends Plugin {
       }
     });
     this.addCommand({
-      id: "rime-toggle-trace-raw",
+      id: "toggle-trace-raw",
       name: "诊断：记录原始按键内容（敏感）",
       callback: () => {
         this.traceRawKeys = !this.traceRawKeys;
@@ -470,7 +470,7 @@ export default class RimeInputPlugin extends Plugin {
       }
     });
     this.addCommand({
-      id: "rime-probe-network",
+      id: "probe-network",
       name: "诊断：网络探测",
       callback: () => {
         void this.probeNetwork().then(() =>
@@ -481,10 +481,10 @@ export default class RimeInputPlugin extends Plugin {
 
   private createControls(): void {
     // Obsidian mobile has no status bar, so the ribbon carries the state there.
-    this.ribbon = this.addRibbonIcon("languages", "切换 RIME 中文输入", () => this.toggle());
+    this.ribbon = this.addRibbonIcon("languages", "砚台：切换输入模式", () => this.toggle());
     if (!Platform.isMobile) {
       this.status = this.addStatusBarItem();
-      this.status.addClass("rime-input-status");
+      this.status.addClass("inkstone-status");
       this.status.addEventListener("click", () => this.toggle());
     }
   }
@@ -500,7 +500,7 @@ export default class RimeInputPlugin extends Plugin {
       const view = this.activeEditor();
       if (view) this.renderEmojiPanel(view);
     }
-    new Notice(`RIME 输入：${MODE_NOTICE[next]}`);
+    new Notice(`砚台：${MODE_NOTICE[next]}`);
   }
 
   private updateStatus(override?: string): void {
@@ -512,16 +512,16 @@ export default class RimeInputPlugin extends Plugin {
     }
     if (this.ribbon) {
       this.ribbon.toggleClass("is-enabled", active);
-      this.ribbon.setAttribute("aria-label", `RIME 输入：${MODE_NOTICE[this.mode]}`);
+      this.ribbon.setAttribute("aria-label", `砚台：${MODE_NOTICE[this.mode]}`);
       setIcon(this.ribbon, this.mode === "emoji" ? "smile" : this.mode === "chinese" && this.ready ? "languages" : "type");
     }
   }
 
   private createPanel(): void {
-    this.panel = document.body.createDiv({ cls: "rime-input-panel" });
+    this.panel = document.body.createDiv({ cls: "inkstone-panel" });
     this.panel.setAttribute("aria-live", "polite");
-    this.preedit = this.panel.createDiv({ cls: "rime-input-preedit" });
-    this.candidates = this.panel.createDiv({ cls: "rime-input-candidates" });
+    this.preedit = this.panel.createDiv({ cls: "inkstone-preedit" });
+    this.candidates = this.panel.createDiv({ cls: "inkstone-candidates" });
   }
 
   /* ---------------- input ---------------- */
@@ -540,7 +540,7 @@ export default class RimeInputPlugin extends Plugin {
     if (reason === "系统输入法组合中") {
       this.imeConflictStreak += 1;
       if (this.imeConflictStreak === 3 && this.mode === "chinese") {
-        new Notice("系统输入法正在接管按键，RIME 收不到输入。请把系统键盘切到英文 ABC。", 8000);
+        new Notice("系统输入法正在接管按键，砚台收不到输入。请把系统键盘切到英文 ABC。", 8000);
       }
     }
     this.markTrace(this.pendingTrace, reason);
@@ -604,7 +604,7 @@ export default class RimeInputPlugin extends Plugin {
         console.error("RIME input failed", error);
         this.log(`process("${rimeKey}") 失败：${this.errorMessage(error)}`);
         this.cancelComposition();
-        new Notice(`RIME 输入失败：${this.errorMessage(error)}`);
+        new Notice(`砚台输入失败：${this.errorMessage(error)}`);
       });
   }
 
