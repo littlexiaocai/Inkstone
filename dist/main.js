@@ -332,13 +332,12 @@ function searchEmoji(query, limit) {
 }
 
 // src/main.ts
-var PLUGIN_VERSION = "0.7.7";
+var PLUGIN_VERSION = "0.7.8";
 var PROBE_URL = "https://cdn.jsdelivr.net/npm/@libreservice/my-rime@0.10.9/dist/rime.js";
 var INIT_TIMEOUT_MS = 45e3;
 var MAX_TRACE = 60;
 var REPORT_FOLDER = "\u781A\u53F0\u8BCA\u65AD";
 var IME_WARN_COOLDOWN_MS = 30 * 1e3;
-var IME_EVIDENCE_TTL_MS = 10 * 60 * 1e3;
 var CJK = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/;
 var EMOJI_PAGE = 7;
 function timeout(promise, ms, label) {
@@ -497,7 +496,6 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
     this.pendingTrace = -1;
     this.shiftArmed = false;
     this.imeConflictStreak = 0;
-    this.lastSystemImeAt = 0;
     this.lastImeWarnAt = 0;
     this.traceEnabled = false;
     this.traceRawKeys = false;
@@ -585,11 +583,14 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
        键盘下疯狂误报（0.7.2 就是这么错的）。
   
        真正可靠的判据是 compositionend 提交了汉字：自动改正提交的是 ASCII，中文输入
-       法提交的是汉字。代价是提醒要等到第一个词上屏之后才出现，可以接受。 */
+       法提交的是汉字。代价是提醒要等到第一个词上屏之后才出现，可以接受。
+  
+       只在「当下真的发生了」时提醒。0.7.2 还做过一条「切换到英文模式时，若 10 分钟内
+       见过中文输入法就提前提醒」，那是凭记忆猜——输入源随时会变，记忆必然过期，
+       必然误报，0.7.8 已删除。 */
   noteSystemIme(event) {
     if (event.type !== "compositionend") return;
     if (!CJK.test(event.data ?? "")) return;
-    this.lastSystemImeAt = Date.now();
     if (this.mode !== "english") return;
     if (Date.now() - this.lastImeWarnAt < IME_WARN_COOLDOWN_MS) return;
     this.lastImeWarnAt = Date.now();
@@ -793,10 +794,6 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
       if (view) this.renderEmojiPanel(view);
     }
     new import_obsidian.Notice(`\u781A\u53F0\uFF1A${MODE_NOTICE[next]}`);
-    if (next === "english" && Date.now() - this.lastSystemImeAt < IME_EVIDENCE_TTL_MS) {
-      this.lastImeWarnAt = Date.now();
-      new import_obsidian.Notice("\u63D0\u9192\uFF1A\u7CFB\u7EDF\u952E\u76D8\u521A\u624D\u5728\u7528\u4E2D\u6587\u8F93\u5165\u6CD5\u3002\u82F1\u6587\u6A21\u5F0F\u4E0D\u62E6\u622A\u6309\u952E\uFF0C\u7CFB\u7EDF\u662F\u4EC0\u4E48\u5C31\u6253\u51FA\u4EC0\u4E48\u2014\u2014\u9700\u8981\u7684\u8BDD\u6309 Ctrl+\u7A7A\u683C \u5207\u5230\u82F1\u6587 ABC\u3002", 8e3);
-    }
   }
   updateStatus(override) {
     const active = this.mode !== "english" && this.ready;
