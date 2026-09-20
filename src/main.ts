@@ -2,7 +2,7 @@ import { App, MarkdownView, Modal, Notice, Platform, Plugin, requestUrl, setIcon
 import workerSource from "./vendor/my-rime-worker.txt";
 import { searchEmoji, type EmojiEntry } from "./emoji";
 
-const PLUGIN_VERSION = "0.7.6";
+const PLUGIN_VERSION = "0.7.7";
 const PROBE_URL = "https://cdn.jsdelivr.net/npm/@libreservice/my-rime@0.10.9/dist/rime.js";
 const INIT_TIMEOUT_MS = 45000;
 const MAX_TRACE = 60;
@@ -313,7 +313,7 @@ export default class InkstonePlugin extends Plugin {
       const handler = (event: Event): void => {
         if (!this.isEditorTarget(event.target)) return;
         this.noteSystemIme(event);
-        this.trace(type, this.describeEvent(event));
+        this.trace(type, `${this.describeEvent(event)} @${this.targetTag(event.target)}`);
       };
       document.addEventListener(type, handler, true);
       this.register(() => document.removeEventListener(type, handler, true));
@@ -382,6 +382,15 @@ export default class InkstonePlugin extends Plugin {
     if (data === null) return "null";
     if (this.traceRawKeys) return JSON.stringify(data);
     return `<${[...data].length} 字符>`;
+  }
+
+  /* shouldCapture 里模式判断排在焦点判断前面，英文模式下所有按键都记成「未启用」，
+     焦点信息就丢了。轨迹里单独带一份，排查时才看得出按键到底落在哪。 */
+  private targetTag(target: EventTarget | null): string {
+    if (!(target instanceof Element)) return "none";
+    if (this.isEditorTarget(target)) return "editor";
+    const cls = target.className?.toString().trim().split(/\s+/)[0] ?? "";
+    return cls || target.tagName.toLowerCase();
   }
 
   private trace(kind: string, detail: string): number {
@@ -640,12 +649,50 @@ export default class InkstonePlugin extends Plugin {
     this.toggle();
   }
 
+  /* iPadOS 把「点系统表情面板」发成 keydown：key 是那个表情本身，code="Unidentified"，
+     keyCode=0。实测它有时不会跟上 beforeinput/input，表情就插不进文档（诊断报告
+     2026-09-20-214712 里 🥳 失败、🤩 成功，同样的动作两种结果）。
+
+     既然按键送到了，就由砚台自己写进文档，不再看系统脸色。preventDefault 掐掉系统
+     那条不稳的插入路径，所以不会重复上屏。
+     判据刻意收窄：keyCode 必须为 0、code 未识别、key 含非 ASCII——正常打字碰不到。 */
+  private isPickerChar(event: KeyboardEvent): boolean {
+    if (event.metaKey || event.ctrlKey || event.altKey) return false;
+    if (event.keyCode !== 0) return false;
+    if (event.code !== "" && event.code !== "Unidentified") return false;
+    const key = event.key;
+    if (!key) return false;
+    if (/^[A-Z][A-Za-z]+$/.test(key)) return false; // Enter / Shift / Unidentified 这类具名键
+    return /[^\x00-\x7F]/.test(key);
+  }
+
+  private insertPickerChar(event: KeyboardEvent): void {
+    if (!this.isEditorTarget(event.target)) return void this.skip("焦点不在编辑器");
+    const view = this.activeEditor();
+    if (!view) return void this.skip("焦点不在编辑器");
+
+    if (this.composing) this.cancelComposition();
+    if (this.mode === "emoji") this.clearEmoji();
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    view.editor.replaceSelection(event.key);
+    this.keydownCaptured += 1;
+    this.markTrace(this.pendingTrace, "表情直接上屏");
+    this.pendingTrace = -1;
+  }
+
   private onKeydown(event: KeyboardEvent): void {
     this.shiftArmed = event.key === "Shift" && !event.ctrlKey && !event.metaKey && !event.altKey;
     this.keydownSeen += 1;
     const target = event.target instanceof Element ? event.target.className.toString().slice(0, 60) : String(event.target);
     this.lastKeyNote = `key=${this.redactKey(event.key)} code=${this.redactCode(event.code)} keyCode=${this.redactKeyCode(event.keyCode)} isComposing=${event.isComposing} target=[${target}]`;
-    this.pendingTrace = this.trace("keydown", `key=${this.redactKey(event.key)} code=${this.redactCode(event.code)} kc=${this.redactKeyCode(event.keyCode)} comp=${event.isComposing}`);
+    this.pendingTrace = this.trace("keydown", `key=${this.redactKey(event.key)} code=${this.redactCode(event.code)} kc=${this.redactKeyCode(event.keyCode)} comp=${event.isComposing} @${this.targetTag(event.target)}`);
+
+    if (this.isPickerChar(event)) {
+      this.insertPickerChar(event);
+      return;
+    }
 
     if (this.mode === "emoji") {
       this.handleEmojiMode(event);
