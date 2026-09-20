@@ -20,7 +20,7 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // src/main.ts
 var main_exports = {};
 __export(main_exports, {
-  default: () => RimeInputPlugin
+  default: () => InkstonePlugin
 });
 module.exports = __toCommonJS(main_exports);
 var import_obsidian = require("obsidian");
@@ -332,7 +332,7 @@ function searchEmoji(query, limit) {
 }
 
 // src/main.ts
-var PLUGIN_VERSION = "0.6.0";
+var PLUGIN_VERSION = "0.7.0";
 var PROBE_URL = "https://cdn.jsdelivr.net/npm/@libreservice/my-rime@0.10.9/dist/rime.js";
 var INIT_TIMEOUT_MS = 45e3;
 var MAX_TRACE = 24;
@@ -430,7 +430,7 @@ var KEY_MAP = {
 };
 var START_PUNCTUATION = /* @__PURE__ */ new Set([",", ".", "?", "!", ";", ":"]);
 var MODE_ORDER = ["chinese", "english", "emoji"];
-var MODE_LABEL = { chinese: "RIME \u4E2D", english: "RIME \u82F1", emoji: "RIME \u{1F600}" };
+var MODE_LABEL = { chinese: "\u781A\u53F0 \u4E2D", english: "\u781A\u53F0 \u82F1", emoji: "\u781A\u53F0 \u{1F600}" };
 var MODE_NOTICE = {
   chinese: "\u4E2D\u6587\uFF08\u7CFB\u7EDF\u952E\u76D8\u8BF7\u7528\u82F1\u6587 ABC\uFF09",
   english: "\u82F1\u6587",
@@ -444,17 +444,17 @@ var DiagnosticsModal = class extends import_obsidian.Modal {
   }
   onOpen() {
     const { contentEl } = this;
-    contentEl.addClass("rime-diag");
-    contentEl.createEl("h3", { text: "RIME \u8F93\u5165 \xB7 \u8BCA\u65AD\u62A5\u544A" });
+    contentEl.addClass("inkstone-diag");
+    contentEl.createEl("h3", { text: "\u781A\u53F0\u8F93\u5165\u6CD5 \xB7 \u8BCA\u65AD\u62A5\u544A" });
     contentEl.createEl("p", {
-      cls: "rime-diag-hint",
+      cls: "inkstone-diag-hint",
       text: this.sensitive ? "\u26A0\uFE0F \u672C\u6B21\u8BB0\u5F55\u5305\u542B\u4F60\u5B9E\u9645\u6572\u4E0B\u7684\u6309\u952E\u5185\u5BB9\u3002\u5916\u53D1\u524D\u8BF7\u5148\u901A\u8BFB\u4E00\u904D\u3002" : "\u53EF\u4EE5\u628A\u8FD9\u4EFD\u62A5\u544A\u53D1\u7ED9\u534F\u52A9\u6392\u67E5\u7684\u4EBA\u3002\u6309\u952E\u5185\u5BB9\u5DF2\u8131\u654F\uFF0C\u53EA\u4FDD\u7559\u7C7B\u522B\uFF08\u5B57\u6BCD/\u6570\u5B57/\u7B26\u53F7\uFF09\u3002"
     });
-    const area = contentEl.createEl("textarea", { cls: "rime-diag-text" });
+    const area = contentEl.createEl("textarea", { cls: "inkstone-diag-text" });
     area.value = this.report;
     area.readOnly = true;
     area.rows = 18;
-    const actions = contentEl.createDiv({ cls: "rime-diag-actions" });
+    const actions = contentEl.createDiv({ cls: "inkstone-diag-actions" });
     const copyButton = actions.createEl("button", { text: "\u590D\u5236\u62A5\u544A", cls: "mod-cta" });
     copyButton.addEventListener("click", async () => {
       try {
@@ -473,7 +473,7 @@ var DiagnosticsModal = class extends import_obsidian.Modal {
     this.contentEl.empty();
   }
 };
-var RimeInputPlugin = class extends import_obsidian.Plugin {
+var InkstonePlugin = class extends import_obsidian.Plugin {
   constructor() {
     super(...arguments);
     this.mode = "chinese";
@@ -519,15 +519,15 @@ var RimeInputPlugin = class extends import_obsidian.Plugin {
       this.ready = true;
       this.updateStatus();
       this.log(`\u5C31\u7EEA\uFF0C\u603B\u8017\u65F6 ${Date.now() - this.startedAt}ms`);
-      new import_obsidian.Notice("RIME \u4E2D\u6587\u8F93\u5165\u5DF2\u5C31\u7EEA\uFF1B\u8BF7\u628A\u7CFB\u7EDF\u952E\u76D8\u5207\u5230\u82F1\u6587 ABC");
+      new import_obsidian.Notice("\u781A\u53F0\u8F93\u5165\u6CD5\u5DF2\u5C31\u7EEA\uFF1B\u8BF7\u628A\u7CFB\u7EDF\u952E\u76D8\u5207\u5230\u82F1\u6587 ABC");
     } catch (error) {
       const message = this.errorMessage(error);
       this.initError = message;
       this.log(`\u521D\u59CB\u5316\u5931\u8D25\uFF1A${message}`);
       console.error("RIME initialization failed", error);
       this.updateStatus("\u52A0\u8F7D\u5931\u8D25");
-      new import_obsidian.Notice(`RIME \u52A0\u8F7D\u5931\u8D25\uFF1A${message}
-\u8BF7\u8FD0\u884C\u547D\u4EE4\u300CRIME \u8F93\u5165\uFF1A\u8BCA\u65AD\u62A5\u544A\u300D\u67E5\u770B\u8BE6\u60C5`, 15e3);
+      new import_obsidian.Notice(`\u781A\u53F0\u52A0\u8F7D\u5931\u8D25\uFF1A${message}
+\u8BF7\u8FD0\u884C\u547D\u4EE4\u300C\u781A\u53F0\u8F93\u5165\u6CD5\uFF1A\u8BCA\u65AD\u62A5\u544A\u300D\u67E5\u770B\u8BE6\u60C5`, 15e3);
     }
   }
   onunload() {
@@ -628,7 +628,7 @@ var RimeInputPlugin = class extends import_obsidian.Plugin {
     const traceState = !this.traceEnabled ? "\u5173\uFF08\u8FD0\u884C\u547D\u4EE4\u300C\u8BCA\u65AD\uFF1A\u5F00\u59CB/\u505C\u6B62\u8BB0\u5F55\u6309\u952E\u4E8B\u4EF6\u300D\u5F00\u542F\uFF09" : this.traceRawKeys ? "\u5F00 \u2014 \u26A0\uFE0F \u542B\u539F\u59CB\u6309\u952E\u5185\u5BB9" : "\u5F00 \u2014 \u5DF2\u8131\u654F";
     const trace = this.eventTrace.length ? this.eventTrace.map((line) => `  ${line}`).join("\n") : "  (\u65E0)";
     return [
-      "RIME \u8F93\u5165 \xB7 \u8BCA\u65AD\u62A5\u544A",
+      "\u781A\u53F0\u8F93\u5165\u6CD5 \xB7 \u8BCA\u65AD\u62A5\u544A",
       `\u751F\u6210\u65F6\u95F4\uFF1A${(/* @__PURE__ */ new Date()).toLocaleString()}`,
       `\u63D2\u4EF6\u7248\u672C\uFF1A${PLUGIN_VERSION}`,
       this.environmentLine(),
@@ -642,7 +642,7 @@ var RimeInputPlugin = class extends import_obsidian.Plugin {
       "",
       "--- \u6309\u952E\u6355\u83B7 ---",
       `  \u6536\u5230 keydown\uFF1A${this.keydownSeen}`,
-      `  \u88AB RIME \u622A\u83B7\uFF1A${this.keydownCaptured}`,
+      `  \u88AB\u781A\u53F0\u622A\u83B7\uFF1A${this.keydownCaptured}`,
       `  \u6700\u8FD1\u4E00\u6B21\u6309\u952E\uFF1A${this.lastKeyNote}`,
       "  \u672A\u622A\u83B7\u539F\u56E0\u7EDF\u8BA1\uFF1A",
       skips,
@@ -661,18 +661,18 @@ var RimeInputPlugin = class extends import_obsidian.Plugin {
   /* ---------------- UI ---------------- */
   registerCommands() {
     this.addCommand({
-      id: "toggle-rime-input",
-      name: "\u5207\u6362 RIME \u4E2D\u6587\u8F93\u5165",
+      id: "toggle-input-mode",
+      name: "\u5207\u6362\u8F93\u5165\u6A21\u5F0F\uFF08\u4E2D / \u82F1 / \u8868\u60C5\uFF09",
       hotkeys: [{ modifiers: ["Mod", "Shift"], key: "Space" }],
       callback: () => this.toggle()
     });
     this.addCommand({
-      id: "rime-diagnostics",
+      id: "diagnostics",
       name: "\u8BCA\u65AD\u62A5\u544A",
       callback: () => new DiagnosticsModal(this.app, this.buildReport(), this.traceRawKeys).open()
     });
     this.addCommand({
-      id: "rime-toggle-trace",
+      id: "toggle-trace",
       name: "\u8BCA\u65AD\uFF1A\u5F00\u59CB/\u505C\u6B62\u8BB0\u5F55\u6309\u952E\u4E8B\u4EF6",
       callback: () => {
         this.traceEnabled = !this.traceEnabled;
@@ -686,7 +686,7 @@ var RimeInputPlugin = class extends import_obsidian.Plugin {
       }
     });
     this.addCommand({
-      id: "rime-toggle-trace-raw",
+      id: "toggle-trace-raw",
       name: "\u8BCA\u65AD\uFF1A\u8BB0\u5F55\u539F\u59CB\u6309\u952E\u5185\u5BB9\uFF08\u654F\u611F\uFF09",
       callback: () => {
         this.traceRawKeys = !this.traceRawKeys;
@@ -699,7 +699,7 @@ var RimeInputPlugin = class extends import_obsidian.Plugin {
       }
     });
     this.addCommand({
-      id: "rime-probe-network",
+      id: "probe-network",
       name: "\u8BCA\u65AD\uFF1A\u7F51\u7EDC\u63A2\u6D4B",
       callback: () => {
         void this.probeNetwork().then(() => new DiagnosticsModal(this.app, this.buildReport(), this.traceRawKeys).open());
@@ -707,10 +707,10 @@ var RimeInputPlugin = class extends import_obsidian.Plugin {
     });
   }
   createControls() {
-    this.ribbon = this.addRibbonIcon("languages", "\u5207\u6362 RIME \u4E2D\u6587\u8F93\u5165", () => this.toggle());
+    this.ribbon = this.addRibbonIcon("languages", "\u781A\u53F0\uFF1A\u5207\u6362\u8F93\u5165\u6A21\u5F0F", () => this.toggle());
     if (!import_obsidian.Platform.isMobile) {
       this.status = this.addStatusBarItem();
-      this.status.addClass("rime-input-status");
+      this.status.addClass("inkstone-status");
       this.status.addEventListener("click", () => this.toggle());
     }
   }
@@ -725,7 +725,7 @@ var RimeInputPlugin = class extends import_obsidian.Plugin {
       const view = this.activeEditor();
       if (view) this.renderEmojiPanel(view);
     }
-    new import_obsidian.Notice(`RIME \u8F93\u5165\uFF1A${MODE_NOTICE[next]}`);
+    new import_obsidian.Notice(`\u781A\u53F0\uFF1A${MODE_NOTICE[next]}`);
   }
   updateStatus(override) {
     const active = this.mode !== "english" && this.ready;
@@ -736,15 +736,15 @@ var RimeInputPlugin = class extends import_obsidian.Plugin {
     }
     if (this.ribbon) {
       this.ribbon.toggleClass("is-enabled", active);
-      this.ribbon.setAttribute("aria-label", `RIME \u8F93\u5165\uFF1A${MODE_NOTICE[this.mode]}`);
+      this.ribbon.setAttribute("aria-label", `\u781A\u53F0\uFF1A${MODE_NOTICE[this.mode]}`);
       (0, import_obsidian.setIcon)(this.ribbon, this.mode === "emoji" ? "smile" : this.mode === "chinese" && this.ready ? "languages" : "type");
     }
   }
   createPanel() {
-    this.panel = document.body.createDiv({ cls: "rime-input-panel" });
+    this.panel = document.body.createDiv({ cls: "inkstone-panel" });
     this.panel.setAttribute("aria-live", "polite");
-    this.preedit = this.panel.createDiv({ cls: "rime-input-preedit" });
-    this.candidates = this.panel.createDiv({ cls: "rime-input-candidates" });
+    this.preedit = this.panel.createDiv({ cls: "inkstone-preedit" });
+    this.candidates = this.panel.createDiv({ cls: "inkstone-candidates" });
   }
   /* ---------------- input ---------------- */
   isEditorTarget(target) {
@@ -758,7 +758,7 @@ var RimeInputPlugin = class extends import_obsidian.Plugin {
     if (reason === "\u7CFB\u7EDF\u8F93\u5165\u6CD5\u7EC4\u5408\u4E2D") {
       this.imeConflictStreak += 1;
       if (this.imeConflictStreak === 3 && this.mode === "chinese") {
-        new import_obsidian.Notice("\u7CFB\u7EDF\u8F93\u5165\u6CD5\u6B63\u5728\u63A5\u7BA1\u6309\u952E\uFF0CRIME \u6536\u4E0D\u5230\u8F93\u5165\u3002\u8BF7\u628A\u7CFB\u7EDF\u952E\u76D8\u5207\u5230\u82F1\u6587 ABC\u3002", 8e3);
+        new import_obsidian.Notice("\u7CFB\u7EDF\u8F93\u5165\u6CD5\u6B63\u5728\u63A5\u7BA1\u6309\u952E\uFF0C\u781A\u53F0\u6536\u4E0D\u5230\u8F93\u5165\u3002\u8BF7\u628A\u7CFB\u7EDF\u952E\u76D8\u5207\u5230\u82F1\u6587 ABC\u3002", 8e3);
       }
     }
     this.markTrace(this.pendingTrace, reason);
@@ -811,7 +811,7 @@ var RimeInputPlugin = class extends import_obsidian.Plugin {
       console.error("RIME input failed", error);
       this.log(`process("${rimeKey}") \u5931\u8D25\uFF1A${this.errorMessage(error)}`);
       this.cancelComposition();
-      new import_obsidian.Notice(`RIME \u8F93\u5165\u5931\u8D25\uFF1A${this.errorMessage(error)}`);
+      new import_obsidian.Notice(`\u781A\u53F0\u8F93\u5165\u5931\u8D25\uFF1A${this.errorMessage(error)}`);
     });
   }
   handleEmojiMode(event) {
