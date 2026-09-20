@@ -1,7 +1,7 @@
 import { App, MarkdownView, Modal, Notice, Platform, Plugin, requestUrl, setIcon } from "obsidian";
 import workerSource from "./vendor/my-rime-worker.txt";
 
-const PLUGIN_VERSION = "0.4.0";
+const PLUGIN_VERSION = "0.5.0";
 const PROBE_URL = "https://cdn.jsdelivr.net/npm/@libreservice/my-rime@0.10.9/dist/rime.js";
 const INIT_TIMEOUT_MS = 45000;
 const MAX_TRACE = 24;
@@ -141,7 +141,7 @@ type SkipReason =
   | "非拼音按键";
 
 class DiagnosticsModal extends Modal {
-  constructor(app: App, private report: string) {
+  constructor(app: App, private report: string, private sensitive = false) {
     super(app);
   }
 
@@ -151,7 +151,9 @@ class DiagnosticsModal extends Modal {
     contentEl.createEl("h3", { text: "RIME 输入 · 诊断报告" });
     contentEl.createEl("p", {
       cls: "rime-diag-hint",
-      text: "复制这份报告发给协助排查的人，它记录了初始化每一步和按键捕获情况。"
+      text: this.sensitive
+        ? "⚠️ 本次记录包含你实际敲下的按键内容。外发前请先通读一遍。"
+        : "可以把这份报告发给协助排查的人。按键内容已脱敏，只保留类别（字母/数字/符号）。"
     });
     const area = contentEl.createEl("textarea", { cls: "rime-diag-text" });
     area.value = this.report;
@@ -204,6 +206,8 @@ export default class RimeInputPlugin extends Plugin {
   private pendingTrace = -1;
   private shiftArmed = false;
   private imeConflictStreak = 0;
+  private traceEnabled = false;
+  private traceRawKeys = false;
 
   async onload(): Promise<void> {
     this.log(`插件 ${PLUGIN_VERSION} 载入`);
@@ -218,8 +222,6 @@ export default class RimeInputPlugin extends Plugin {
     this.updateStatus("正在加载…");
 
     try {
-      await this.probeNetwork();
-
       const t0 = Date.now();
       this.client = new RimeWorkerClient(workerSource, (message) => this.log(message));
       this.log(`Worker 已创建（${Date.now() - t0}ms）`);
@@ -300,14 +302,50 @@ export default class RimeInputPlugin extends Plugin {
   private describeEvent(event: Event): string {
     const input = event as InputEvent;
     if (typeof input.inputType === "string") {
-      return `inputType="${input.inputType}" data=${JSON.stringify(input.data)} comp=${input.isComposing}`;
+      return `inputType="${input.inputType}" data=${this.redactData(input.data)} comp=${input.isComposing}`;
     }
     const composition = event as CompositionEvent;
-    if (typeof composition.data === "string") return `data=${JSON.stringify(composition.data)}`;
+    if (typeof composition.data === "string") return `data=${this.redactData(composition.data)}`;
     return "";
   }
 
+  /* 默认只吐类别，不吐用户敲了什么。诊断 iPad 软键盘要的是「key 是不是 Unidentified」，
+     而不是「用户打了什么字」——类别足够回答前者。 */
+  private redactKey(key: string): string {
+    if (this.traceRawKeys) return JSON.stringify(key);
+    if (key.length !== 1) return JSON.stringify(key); // Shift / Unidentified / ArrowDown 等具名键不是内容
+    if (/[a-z]/i.test(key)) return "<字母>";
+    if (/[0-9]/.test(key)) return "<数字>";
+    if (/\s/.test(key)) return "<空白>";
+    return "<符号>";
+  }
+
+  /* code 和 keyCode 同样会泄露按了哪个键（keyCode 81 就是 Q）。但 code="" 和 keyCode=229
+     是判定 iOS 软键盘行为的关键信号，不能一刀切抹掉——只把「能还原出字符」的那部分换成类别。 */
+  private redactCode(code: string): string {
+    if (this.traceRawKeys) return JSON.stringify(code);
+    if (/^Key[A-Z]$/.test(code)) return "<字母键>";
+    if (/^Digit[0-9]$/.test(code)) return "<数字键>";
+    if (/^Numpad[0-9]$/.test(code)) return "<小键盘数字>";
+    return JSON.stringify(code); // ""、"Space"、"Escape"、"ArrowDown" 等
+  }
+
+  private redactKeyCode(keyCode: number): string {
+    if (this.traceRawKeys) return String(keyCode);
+    // 229 = 系统输入法组合中，0 = 未提供；这两个必须原样保留
+    if (keyCode === 229 || keyCode === 0) return String(keyCode);
+    const isContent = (keyCode >= 48 && keyCode <= 57) || (keyCode >= 65 && keyCode <= 90);
+    return isContent ? "<内容>" : String(keyCode);
+  }
+
+  private redactData(data: string | null): string {
+    if (data === null) return "null";
+    if (this.traceRawKeys) return JSON.stringify(data);
+    return `<${[...data].length} 字符>`;
+  }
+
   private trace(kind: string, detail: string): number {
+    if (!this.traceEnabled) return -1;
     this.eventCounts[kind] = (this.eventCounts[kind] ?? 0) + 1;
     const stamp = String(Date.now() - this.startedAt).padStart(6, " ");
     this.eventTrace.push(`[+${stamp}ms] ${kind} ${detail}`);
@@ -329,6 +367,12 @@ export default class RimeInputPlugin extends Plugin {
     const counts = Object.entries(this.eventCounts)
       .map(([kind, n]) => `  ${kind}: ${n}`)
       .join("\n") || "  (无)";
+
+    const traceState = !this.traceEnabled
+      ? "关（运行命令「诊断：开始/停止记录按键事件」开启）"
+      : this.traceRawKeys
+        ? "开 — ⚠️ 含原始按键内容"
+        : "开 — 已脱敏";
 
     const trace = this.eventTrace.length
       ? this.eventTrace.map((line) => `  ${line}`).join("\n")
@@ -358,6 +402,7 @@ export default class RimeInputPlugin extends Plugin {
       counts,
       "",
       `--- 最近事件轨迹（最多 ${MAX_TRACE} 条）---`,
+      `  记录状态：${traceState}`,
       trace,
       "",
       "--- 初始化过程 ---",
@@ -377,7 +422,46 @@ export default class RimeInputPlugin extends Plugin {
     this.addCommand({
       id: "rime-diagnostics",
       name: "诊断报告",
-      callback: () => new DiagnosticsModal(this.app, this.buildReport()).open()
+      callback: () => new DiagnosticsModal(this.app, this.buildReport(), this.traceRawKeys).open()
+    });
+    this.addCommand({
+      id: "rime-toggle-trace",
+      name: "诊断：开始/停止记录按键事件",
+      callback: () => {
+        this.traceEnabled = !this.traceEnabled;
+        if (this.traceEnabled) {
+          this.eventTrace = [];
+          this.eventCounts = {};
+        } else {
+          this.traceRawKeys = false;
+        }
+        new Notice(this.traceEnabled
+          ? "按键事件记录：开（内容已脱敏）。复现问题后运行「诊断报告」。"
+          : "按键事件记录：关。");
+      }
+    });
+    this.addCommand({
+      id: "rime-toggle-trace-raw",
+      name: "诊断：记录原始按键内容（敏感）",
+      callback: () => {
+        this.traceRawKeys = !this.traceRawKeys;
+        if (this.traceRawKeys && !this.traceEnabled) {
+          this.traceEnabled = true;
+          this.eventTrace = [];
+          this.eventCounts = {};
+        }
+        new Notice(this.traceRawKeys
+          ? "⚠️ 记录已包含你实际敲下的按键内容，报告外发前请通读。再运行一次此命令可关闭。"
+          : "已恢复脱敏记录。", 8000);
+      }
+    });
+    this.addCommand({
+      id: "rime-probe-network",
+      name: "诊断：网络探测",
+      callback: () => {
+        void this.probeNetwork().then(() =>
+          new DiagnosticsModal(this.app, this.buildReport(), this.traceRawKeys).open());
+      }
     });
   }
 
@@ -470,8 +554,8 @@ export default class RimeInputPlugin extends Plugin {
     this.shiftArmed = event.key === "Shift" && !event.ctrlKey && !event.metaKey && !event.altKey;
     this.keydownSeen += 1;
     const target = event.target instanceof Element ? event.target.className.toString().slice(0, 60) : String(event.target);
-    this.lastKeyNote = `key="${event.key}" code="${event.code}" keyCode=${event.keyCode} isComposing=${event.isComposing} target=[${target}]`;
-    this.pendingTrace = this.trace("keydown", `key=${JSON.stringify(event.key)} code="${event.code}" kc=${event.keyCode} comp=${event.isComposing}`);
+    this.lastKeyNote = `key=${this.redactKey(event.key)} code=${this.redactCode(event.code)} keyCode=${this.redactKeyCode(event.keyCode)} isComposing=${event.isComposing} target=[${target}]`;
+    this.pendingTrace = this.trace("keydown", `key=${this.redactKey(event.key)} code=${this.redactCode(event.code)} kc=${this.redactKeyCode(event.keyCode)} comp=${event.isComposing}`);
 
     if (!this.shouldCapture(event)) return;
     const view = this.activeEditor();
