@@ -2,7 +2,7 @@ import { App, MarkdownView, Modal, Notice, Platform, Plugin, requestUrl, setIcon
 import workerSource from "./vendor/my-rime-worker.txt";
 import { searchEmoji, type EmojiEntry } from "./emoji";
 
-const PLUGIN_VERSION = "0.7.5";
+const PLUGIN_VERSION = "0.7.6";
 const PROBE_URL = "https://cdn.jsdelivr.net/npm/@libreservice/my-rime@0.10.9/dist/rime.js";
 const INIT_TIMEOUT_MS = 45000;
 const MAX_TRACE = 60;
@@ -474,23 +474,23 @@ export default class InkstonePlugin extends Plugin {
   private registerCommands(): void {
     this.addCommand({
       id: "toggle-chinese-english",
-      name: "切换中英文",
+      name: "切换中英文 (toggle)",
       hotkeys: [{ modifiers: ["Mod", "Shift"], key: "Space" }],
       callback: () => this.toggle()
     });
     this.addCommand({
       id: "toggle-emoji",
-      name: "切换表情模式",
+      name: "切换表情模式 (emoji)",
       callback: () => this.toggleEmoji()
     });
     this.addCommand({
       id: "diagnostics",
-      name: "诊断报告",
+      name: "诊断报告 (report)",
       callback: () => new DiagnosticsModal(this.app, this.buildReport(), this.traceRawKeys).open()
     });
     this.addCommand({
       id: "toggle-trace",
-      name: "诊断：开始/停止记录按键事件",
+      name: "诊断：开始/停止记录按键事件 (trace)",
       callback: () => {
         this.traceEnabled = !this.traceEnabled;
         if (this.traceEnabled) {
@@ -506,7 +506,7 @@ export default class InkstonePlugin extends Plugin {
     });
     this.addCommand({
       id: "toggle-trace-raw",
-      name: "诊断：记录原始按键内容（敏感）",
+      name: "诊断：记录原始按键内容 敏感 (trace raw)",
       callback: () => {
         this.traceRawKeys = !this.traceRawKeys;
         if (this.traceRawKeys && !this.traceEnabled) {
@@ -521,12 +521,12 @@ export default class InkstonePlugin extends Plugin {
     });
     this.addCommand({
       id: "save-report",
-      name: "诊断：把报告存进 Vault（可同步到电脑排查）",
+      name: "诊断：把报告存进 Vault (save report)",
       callback: () => void this.saveReport()
     });
     this.addCommand({
       id: "probe-network",
-      name: "诊断：网络探测",
+      name: "诊断：网络探测 (network)",
       callback: () => {
         void this.probeNetwork().then(() =>
           new DiagnosticsModal(this.app, this.buildReport(), this.traceRawKeys).open());
