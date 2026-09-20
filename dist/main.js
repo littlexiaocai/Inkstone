@@ -332,10 +332,11 @@ function searchEmoji(query, limit) {
 }
 
 // src/main.ts
-var PLUGIN_VERSION = "0.7.0";
+var PLUGIN_VERSION = "0.7.1";
 var PROBE_URL = "https://cdn.jsdelivr.net/npm/@libreservice/my-rime@0.10.9/dist/rime.js";
 var INIT_TIMEOUT_MS = 45e3;
 var MAX_TRACE = 24;
+var REPORT_FOLDER = "\u781A\u53F0\u8BCA\u65AD";
 var EMOJI_PAGE = 7;
 function timeout(promise, ms, label) {
   return new Promise((resolve, reject) => {
@@ -622,6 +623,24 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
     if (index < 0 || index >= this.eventTrace.length) return;
     this.eventTrace[index] += ` \u2192 ${marker}`;
   }
+  /* 报告本来只在内存里，iPad 上排查只能靠手抄。写成 Vault 笔记后可以随
+     Obsidian Sync 到别的设备，两头都能直接读。脱敏规则与屏幕上的报告一致。 */
+  async saveReport() {
+    const d = /* @__PURE__ */ new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    const stamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+    const path = `${REPORT_FOLDER}/${stamp}.md`;
+    try {
+      if (!this.app.vault.getAbstractFileByPath(REPORT_FOLDER)) {
+        await this.app.vault.createFolder(REPORT_FOLDER);
+      }
+      const file = await this.app.vault.create(path, "```\n" + this.buildReport() + "\n```\n");
+      new import_obsidian.Notice(`\u8BCA\u65AD\u62A5\u544A\u5DF2\u5B58\u5230 ${path}`, 8e3);
+      await this.app.workspace.getLeaf(true).openFile(file);
+    } catch (error) {
+      new import_obsidian.Notice(`\u4FDD\u5B58\u8BCA\u65AD\u62A5\u544A\u5931\u8D25\uFF1A${this.errorMessage(error)}`, 8e3);
+    }
+  }
   buildReport() {
     const skips = Object.entries(this.skipCounts).sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0)).map(([reason, count]) => `    ${reason}: ${count}`).join("\n") || "    (\u65E0)";
     const counts = Object.entries(this.eventCounts).map(([kind, n]) => `  ${kind}: ${n}`).join("\n") || "  (\u65E0)";
@@ -697,6 +716,11 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
         }
         new import_obsidian.Notice(this.traceRawKeys ? "\u26A0\uFE0F \u8BB0\u5F55\u5DF2\u5305\u542B\u4F60\u5B9E\u9645\u6572\u4E0B\u7684\u6309\u952E\u5185\u5BB9\uFF0C\u62A5\u544A\u5916\u53D1\u524D\u8BF7\u901A\u8BFB\u3002\u518D\u8FD0\u884C\u4E00\u6B21\u6B64\u547D\u4EE4\u53EF\u5173\u95ED\u3002" : "\u5DF2\u6062\u590D\u8131\u654F\u8BB0\u5F55\u3002", 8e3);
       }
+    });
+    this.addCommand({
+      id: "save-report",
+      name: "\u8BCA\u65AD\uFF1A\u628A\u62A5\u544A\u5B58\u8FDB Vault\uFF08\u53EF\u540C\u6B65\u5230\u7535\u8111\u6392\u67E5\uFF09",
+      callback: () => void this.saveReport()
     });
     this.addCommand({
       id: "probe-network",

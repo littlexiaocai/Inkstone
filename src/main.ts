@@ -2,10 +2,11 @@ import { App, MarkdownView, Modal, Notice, Platform, Plugin, requestUrl, setIcon
 import workerSource from "./vendor/my-rime-worker.txt";
 import { searchEmoji, type EmojiEntry } from "./emoji";
 
-const PLUGIN_VERSION = "0.7.0";
+const PLUGIN_VERSION = "0.7.1";
 const PROBE_URL = "https://cdn.jsdelivr.net/npm/@libreservice/my-rime@0.10.9/dist/rime.js";
 const INIT_TIMEOUT_MS = 45000;
 const MAX_TRACE = 24;
+const REPORT_FOLDER = "砚台诊断";
 const EMOJI_PAGE = 7;
 
 type Candidate = { text: string; comment?: string };
@@ -372,6 +373,25 @@ export default class InkstonePlugin extends Plugin {
     this.eventTrace[index] += ` → ${marker}`;
   }
 
+  /* 报告本来只在内存里，iPad 上排查只能靠手抄。写成 Vault 笔记后可以随
+     Obsidian Sync 到别的设备，两头都能直接读。脱敏规则与屏幕上的报告一致。 */
+  private async saveReport(): Promise<void> {
+    const d = new Date();
+    const pad = (n: number): string => String(n).padStart(2, "0");
+    const stamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+    const path = `${REPORT_FOLDER}/${stamp}.md`;
+    try {
+      if (!this.app.vault.getAbstractFileByPath(REPORT_FOLDER)) {
+        await this.app.vault.createFolder(REPORT_FOLDER);
+      }
+      const file = await this.app.vault.create(path, "```\n" + this.buildReport() + "\n```\n");
+      new Notice(`诊断报告已存到 ${path}`, 8000);
+      await this.app.workspace.getLeaf(true).openFile(file);
+    } catch (error) {
+      new Notice(`保存诊断报告失败：${this.errorMessage(error)}`, 8000);
+    }
+  }
+
   private buildReport(): string {
     const skips = Object.entries(this.skipCounts)
       .sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0))
@@ -468,6 +488,11 @@ export default class InkstonePlugin extends Plugin {
           ? "⚠️ 记录已包含你实际敲下的按键内容，报告外发前请通读。再运行一次此命令可关闭。"
           : "已恢复脱敏记录。", 8000);
       }
+    });
+    this.addCommand({
+      id: "save-report",
+      name: "诊断：把报告存进 Vault（可同步到电脑排查）",
+      callback: () => void this.saveReport()
     });
     this.addCommand({
       id: "probe-network",
