@@ -332,13 +332,12 @@ function searchEmoji(query, limit) {
 }
 
 // src/main.ts
-var PLUGIN_VERSION = "0.7.10";
+var PLUGIN_VERSION = "0.7.11";
 var PROBE_URL = "https://cdn.jsdelivr.net/npm/@libreservice/my-rime@0.10.9/dist/rime.js";
 var INIT_TIMEOUT_MS = 45e3;
 var MAX_TRACE = 60;
 var REPORT_FOLDER = "\u781A\u53F0\u8BCA\u65AD";
 var IME_WARN_COOLDOWN_MS = 30 * 1e3;
-var READY_HINT = "\u781A\u53F0\u8F93\u5165\u6CD5\u5DF2\u5C31\u7EEA\u2014\u2014\u6309 Shift \u5728\u4E2D\u82F1\u6587\u4E4B\u95F4\u5207\u6362";
 var CJK = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/;
 var EMOJI_PAGE = 7;
 function timeout(promise, ms, label) {
@@ -433,11 +432,39 @@ var KEY_MAP = {
   "'": "apostrophe"
 };
 var START_PUNCTUATION = /* @__PURE__ */ new Set([",", ".", "?", "!", ";", ":"]);
+var TOGGLE_KEY_LABEL = {
+  Shift: "Shift",
+  Control: "Control",
+  Alt: "Option / Alt",
+  Meta: "Command / Win",
+  none: "\u5173\u95ED\uFF08\u53EA\u7528\u547D\u4EE4\u6216\u72B6\u6001\u680F\u5207\u6362\uFF09"
+};
+var DEFAULT_SETTINGS = { toggleKey: "Shift" };
 var MODE_LABEL = { chinese: "\u781A\u53F0 \u4E2D", english: "\u781A\u53F0 \u82F1", emoji: "\u781A\u53F0 \u{1F600}" };
 var MODE_NOTICE = {
   chinese: "\u4E2D\u6587",
   english: "\u82F1\u6587",
   emoji: "\u8868\u60C5 \u2014 \u6253\u5173\u952E\u8BCD\u641C\u7D22\uFF0C\u5982 xiao / smile / huo\u3002\u6309 Shift \u56DE\u4E2D\u6587"
+};
+var InkstoneSettingTab = class extends import_obsidian.PluginSettingTab {
+  constructor(app, plugin) {
+    super(app, plugin);
+    this.plugin = plugin;
+  }
+  display() {
+    const { containerEl } = this;
+    containerEl.empty();
+    new import_obsidian.Setting(containerEl).setName("\u4E2D\u82F1\u6587\u5207\u6362\u952E").setDesc("\u5355\u72EC\u6309\u4E00\u4E0B\u8FD9\u4E2A\u952E\uFF08\u4E2D\u95F4\u4E0D\u5939\u522B\u7684\u952E\uFF09\u5728\u4E2D\u6587\u548C\u82F1\u6587\u4E4B\u95F4\u5207\u6362\u3002\u547D\u4EE4\u9762\u677F\u91CC\u7684\u300C\u5207\u6362\u4E2D\u82F1\u6587 (toggle)\u300D\u59CB\u7EC8\u53EF\u7528\uFF0C\u4E5F\u53EF\u4EE5\u5728 Obsidian \u7684\u5FEB\u6377\u952E\u8BBE\u7F6E\u91CC\u81EA\u884C\u7ED1\u5B9A\u3002").addDropdown((dropdown) => {
+      for (const [value, label] of Object.entries(TOGGLE_KEY_LABEL)) {
+        dropdown.addOption(value, label);
+      }
+      dropdown.setValue(this.plugin.settings.toggleKey);
+      dropdown.onChange(async (value) => {
+        this.plugin.settings.toggleKey = value;
+        await this.plugin.saveData(this.plugin.settings);
+      });
+    });
+  }
 };
 var DiagnosticsModal = class extends import_obsidian.Modal {
   constructor(app, report, sensitive = false) {
@@ -495,7 +522,8 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
     this.eventTrace = [];
     this.eventCounts = {};
     this.pendingTrace = -1;
-    this.shiftArmed = false;
+    this.toggleArmed = false;
+    this.settings = { ...DEFAULT_SETTINGS };
     this.imeConflictStreak = 0;
     this.lastImeWarnAt = 0;
     this.imeTookOver = false;
@@ -503,6 +531,8 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
     this.traceRawKeys = false;
   }
   async onload() {
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    this.addSettingTab(new InkstoneSettingTab(this.app, this));
     this.log(`\u63D2\u4EF6 ${PLUGIN_VERSION} \u8F7D\u5165`);
     this.log(this.environmentLine());
     this.createPanel();
@@ -524,7 +554,7 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
       this.ready = true;
       this.updateStatus();
       this.log(`\u5C31\u7EEA\uFF0C\u603B\u8017\u65F6 ${Date.now() - this.startedAt}ms`);
-      new import_obsidian.Notice(READY_HINT);
+      new import_obsidian.Notice(this.readyHint());
     } catch (error) {
       const message = this.errorMessage(error);
       this.initError = message;
@@ -648,6 +678,10 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
   }
   /* shouldCapture 里模式判断排在焦点判断前面，英文模式下所有按键都记成「未启用」，
      焦点信息就丢了。轨迹里单独带一份，排查时才看得出按键到底落在哪。 */
+  readyHint() {
+    const key = this.settings.toggleKey;
+    return key === "none" ? "\u781A\u53F0\u8F93\u5165\u6CD5\u5DF2\u5C31\u7EEA\u2014\u2014\u7528\u547D\u4EE4\u300C\u5207\u6362\u4E2D\u82F1\u6587 (toggle)\u300D\u6216\u70B9\u72B6\u6001\u680F\u5207\u6362" : `\u781A\u53F0\u8F93\u5165\u6CD5\u5DF2\u5C31\u7EEA\u2014\u2014\u6309 ${TOGGLE_KEY_LABEL[key]} \u5728\u4E2D\u82F1\u6587\u4E4B\u95F4\u5207\u6362`;
+  }
   targetTag(target) {
     if (!(target instanceof Element)) return "none";
     if (this.isEditorTarget(target)) return "editor";
@@ -725,7 +759,6 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
     this.addCommand({
       id: "toggle-chinese-english",
       name: "\u5207\u6362\u4E2D\u82F1\u6587 (toggle)",
-      hotkeys: [{ modifiers: ["Mod", "Shift"], key: "Space" }],
       callback: () => this.toggle()
     });
     this.addCommand({
@@ -857,10 +890,19 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
     if (event.shiftKey) return this.skip("\u5E26\u4FEE\u9970\u952E");
     return /^[a-z]$/i.test(event.key) || START_PUNCTUATION.has(event.key) ? true : this.skip("\u975E\u62FC\u97F3\u6309\u952E");
   }
-  /* 单独按下并松开 Shift（中间没有别的键）＝ 中/英切换，沿用 RIME 的习惯。 */
+  /* 单独按下并松开切换键（中间没有别的键）＝ 中/英切换。默认 Shift，可在设置里改。 */
+  isToggleKeyAlone(event) {
+    const key = this.settings.toggleKey;
+    if (key === "none" || event.key !== key) return false;
+    if (key !== "Control" && event.ctrlKey) return false;
+    if (key !== "Meta" && event.metaKey) return false;
+    if (key !== "Alt" && event.altKey) return false;
+    if (key !== "Shift" && event.shiftKey) return false;
+    return true;
+  }
   onKeyup(event) {
-    if (event.key !== "Shift" || !this.shiftArmed) return;
-    this.shiftArmed = false;
+    if (event.key !== this.settings.toggleKey || !this.toggleArmed) return;
+    this.toggleArmed = false;
     if (!this.ready || !this.isEditorTarget(event.target)) return;
     this.toggle();
   }
@@ -904,10 +946,10 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
     if (event.key.length !== 1) return;
     if (!this.isEditorTarget(event.target)) return;
     this.imeTookOver = false;
-    new import_obsidian.Notice(READY_HINT, 6e3);
+    new import_obsidian.Notice(this.readyHint(), 6e3);
   }
   onKeydown(event) {
-    this.shiftArmed = event.key === "Shift" && !event.ctrlKey && !event.metaKey && !event.altKey;
+    this.toggleArmed = this.isToggleKeyAlone(event);
     this.keydownSeen += 1;
     const target = event.target instanceof Element ? event.target.className.toString().slice(0, 60) : String(event.target);
     this.lastKeyNote = `key=${this.redactKey(event.key)} code=${this.redactCode(event.code)} keyCode=${this.redactKeyCode(event.keyCode)} isComposing=${event.isComposing} target=[${target}]`;

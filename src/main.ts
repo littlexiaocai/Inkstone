@@ -1,15 +1,14 @@
-import { App, MarkdownView, Modal, Notice, Platform, Plugin, requestUrl, setIcon } from "obsidian";
+import { App, MarkdownView, Modal, Notice, Platform, Plugin, PluginSettingTab, Setting, requestUrl, setIcon } from "obsidian";
 import workerSource from "./vendor/my-rime-worker.txt";
 import { searchEmoji, type EmojiEntry } from "./emoji";
 
-const PLUGIN_VERSION = "0.7.10";
+const PLUGIN_VERSION = "0.7.11";
 const PROBE_URL = "https://cdn.jsdelivr.net/npm/@libreservice/my-rime@0.10.9/dist/rime.js";
 const INIT_TIMEOUT_MS = 45000;
 const MAX_TRACE = 60;
 const REPORT_FOLDER = "砚台诊断";
 // 同一条提醒的最短间隔，以及「系统输入法刚才在工作」这条证据的有效期。
 const IME_WARN_COOLDOWN_MS = 30 * 1000;
-const READY_HINT = "砚台输入法已就绪——按 Shift 在中英文之间切换";
 const CJK = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/;
 const EMOJI_PAGE = 7;
 
@@ -141,6 +140,24 @@ const START_PUNCTUATION = new Set([",", ".", "?", "!", ";", ":"]);
 
 type InputMode = "chinese" | "english" | "emoji";
 
+/* 中英切换键可配。默认 Shift，沿用多数输入法的习惯；但 Shift 在某些键盘布局或
+   其他插件下可能被占用，所以留出口让用户改，也允许彻底关掉只用命令。 */
+type ToggleKey = "Shift" | "Control" | "Alt" | "Meta" | "none";
+
+const TOGGLE_KEY_LABEL: Record<ToggleKey, string> = {
+  Shift: "Shift",
+  Control: "Control",
+  Alt: "Option / Alt",
+  Meta: "Command / Win",
+  none: "关闭（只用命令或状态栏切换）"
+};
+
+interface InkstoneSettings {
+  toggleKey: ToggleKey;
+}
+
+const DEFAULT_SETTINGS: InkstoneSettings = { toggleKey: "Shift" };
+
 const MODE_LABEL: Record<InputMode, string> = { chinese: "砚台 中", english: "砚台 英", emoji: "砚台 😀" };
 const MODE_NOTICE: Record<InputMode, string> = {
   chinese: "中文",
@@ -155,6 +172,31 @@ type SkipReason =
   | "带修饰键"
   | "系统输入法组合中"
   | "非拼音按键";
+
+class InkstoneSettingTab extends PluginSettingTab {
+  constructor(app: App, private plugin: InkstonePlugin) {
+    super(app, plugin);
+  }
+
+  display(): void {
+    const { containerEl } = this;
+    containerEl.empty();
+
+    new Setting(containerEl)
+      .setName("中英文切换键")
+      .setDesc("单独按一下这个键（中间不夹别的键）在中文和英文之间切换。命令面板里的「切换中英文 (toggle)」始终可用，也可以在 Obsidian 的快捷键设置里自行绑定。")
+      .addDropdown((dropdown) => {
+        for (const [value, label] of Object.entries(TOGGLE_KEY_LABEL)) {
+          dropdown.addOption(value, label);
+        }
+        dropdown.setValue(this.plugin.settings.toggleKey);
+        dropdown.onChange(async (value) => {
+          this.plugin.settings.toggleKey = value as ToggleKey;
+          await this.plugin.saveData(this.plugin.settings);
+        });
+      });
+  }
+}
 
 class DiagnosticsModal extends Modal {
   constructor(app: App, private report: string, private sensitive = false) {
@@ -222,7 +264,8 @@ export default class InkstonePlugin extends Plugin {
   private eventTrace: string[] = [];
   private eventCounts: Record<string, number> = {};
   private pendingTrace = -1;
-  private shiftArmed = false;
+  private toggleArmed = false;
+  settings: InkstoneSettings = { ...DEFAULT_SETTINGS };
   private imeConflictStreak = 0;
   private lastImeWarnAt = 0;
   private imeTookOver = false;
@@ -230,6 +273,8 @@ export default class InkstonePlugin extends Plugin {
   private traceRawKeys = false;
 
   async onload(): Promise<void> {
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    this.addSettingTab(new InkstoneSettingTab(this.app, this));
     this.log(`插件 ${PLUGIN_VERSION} 载入`);
     this.log(this.environmentLine());
 
@@ -256,7 +301,7 @@ export default class InkstonePlugin extends Plugin {
       this.ready = true;
       this.updateStatus();
       this.log(`就绪，总耗时 ${Date.now() - this.startedAt}ms`);
-      new Notice(READY_HINT);
+      new Notice(this.readyHint());
     } catch (error) {
       const message = this.errorMessage(error);
       this.initError = message;
@@ -399,6 +444,13 @@ export default class InkstonePlugin extends Plugin {
 
   /* shouldCapture 里模式判断排在焦点判断前面，英文模式下所有按键都记成「未启用」，
      焦点信息就丢了。轨迹里单独带一份，排查时才看得出按键到底落在哪。 */
+  private readyHint(): string {
+    const key = this.settings.toggleKey;
+    return key === "none"
+      ? "砚台输入法已就绪——用命令「切换中英文 (toggle)」或点状态栏切换"
+      : `砚台输入法已就绪——按 ${TOGGLE_KEY_LABEL[key]} 在中英文之间切换`;
+  }
+
   private targetTag(target: EventTarget | null): string {
     if (!(target instanceof Element)) return "none";
     if (this.isEditorTarget(target)) return "editor";
@@ -497,7 +549,6 @@ export default class InkstonePlugin extends Plugin {
     this.addCommand({
       id: "toggle-chinese-english",
       name: "切换中英文 (toggle)",
-      hotkeys: [{ modifiers: ["Mod", "Shift"], key: "Space" }],
       callback: () => this.toggle()
     });
     this.addCommand({
@@ -650,10 +701,20 @@ export default class InkstonePlugin extends Plugin {
     return /^[a-z]$/i.test(event.key) || START_PUNCTUATION.has(event.key) ? true : this.skip("非拼音按键");
   }
 
-  /* 单独按下并松开 Shift（中间没有别的键）＝ 中/英切换，沿用 RIME 的习惯。 */
+  /* 单独按下并松开切换键（中间没有别的键）＝ 中/英切换。默认 Shift，可在设置里改。 */
+  private isToggleKeyAlone(event: KeyboardEvent): boolean {
+    const key = this.settings.toggleKey;
+    if (key === "none" || event.key !== key) return false;
+    if (key !== "Control" && event.ctrlKey) return false;
+    if (key !== "Meta" && event.metaKey) return false;
+    if (key !== "Alt" && event.altKey) return false;
+    if (key !== "Shift" && event.shiftKey) return false;
+    return true;
+  }
+
   private onKeyup(event: KeyboardEvent): void {
-    if (event.key !== "Shift" || !this.shiftArmed) return;
-    this.shiftArmed = false;
+    if (event.key !== this.settings.toggleKey || !this.toggleArmed) return;
+    this.toggleArmed = false;
     if (!this.ready || !this.isEditorTarget(event.target)) return;
     this.toggle();
   }
@@ -702,11 +763,11 @@ export default class InkstonePlugin extends Plugin {
     if (event.key.length !== 1) return;
     if (!this.isEditorTarget(event.target)) return;
     this.imeTookOver = false;
-    new Notice(READY_HINT, 6000);
+    new Notice(this.readyHint(), 6000);
   }
 
   private onKeydown(event: KeyboardEvent): void {
-    this.shiftArmed = event.key === "Shift" && !event.ctrlKey && !event.metaKey && !event.altKey;
+    this.toggleArmed = this.isToggleKeyAlone(event);
     this.keydownSeen += 1;
     const target = event.target instanceof Element ? event.target.className.toString().slice(0, 60) : String(event.target);
     this.lastKeyNote = `key=${this.redactKey(event.key)} code=${this.redactCode(event.code)} keyCode=${this.redactKeyCode(event.keyCode)} isComposing=${event.isComposing} target=[${target}]`;
