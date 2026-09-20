@@ -332,11 +332,13 @@ function searchEmoji(query, limit) {
 }
 
 // src/main.ts
-var PLUGIN_VERSION = "0.7.1";
+var PLUGIN_VERSION = "0.7.2";
 var PROBE_URL = "https://cdn.jsdelivr.net/npm/@libreservice/my-rime@0.10.9/dist/rime.js";
 var INIT_TIMEOUT_MS = 45e3;
 var MAX_TRACE = 24;
 var REPORT_FOLDER = "\u781A\u53F0\u8BCA\u65AD";
+var IME_WARN_COOLDOWN_MS = 30 * 1e3;
+var IME_EVIDENCE_TTL_MS = 10 * 60 * 1e3;
 var EMOJI_PAGE = 7;
 function timeout(promise, ms, label) {
   return new Promise((resolve, reject) => {
@@ -495,6 +497,8 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
     this.pendingTrace = -1;
     this.shiftArmed = false;
     this.imeConflictStreak = 0;
+    this.lastSystemImeAt = 0;
+    this.lastImeWarnAt = 0;
     this.traceEnabled = false;
     this.traceRawKeys = false;
   }
@@ -566,11 +570,24 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
     for (const type of types) {
       const handler = (event) => {
         if (!this.isEditorTarget(event.target)) return;
+        this.noteSystemIme(event);
         this.trace(type, this.describeEvent(event));
       };
       document.addEventListener(type, handler, true);
       this.register(() => document.removeEventListener(type, handler, true));
     }
+  }
+  /* 英文模式下砚台完全放行按键，打出中文还是英文取决于系统输入源。插件查不到
+     系统输入源（网页环境没有这个 API），但系统中文输入法一工作就会发 composition
+     事件——这是直接证据，不是推测。 */
+  noteSystemIme(event) {
+    const composing = event.type.startsWith("composition") || event.isComposing === true;
+    if (!composing) return;
+    this.lastSystemImeAt = Date.now();
+    if (this.mode !== "english") return;
+    if (Date.now() - this.lastImeWarnAt < IME_WARN_COOLDOWN_MS) return;
+    this.lastImeWarnAt = Date.now();
+    new import_obsidian.Notice("\u4F60\u5728\u82F1\u6587\u6A21\u5F0F\uFF0C\u4F46\u7CFB\u7EDF\u952E\u76D8\u6B63\u7528\u4E2D\u6587\u8F93\u5165\u6CD5\u8F6C\u6362\u3002\u6309 Ctrl+\u7A7A\u683C \u6216\u5730\u7403\u952E\uFF0C\u628A\u7CFB\u7EDF\u952E\u76D8\u5207\u5230\u82F1\u6587 ABC\u3002", 8e3);
   }
   describeEvent(event) {
     const input = event;
@@ -750,6 +767,10 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
       if (view) this.renderEmojiPanel(view);
     }
     new import_obsidian.Notice(`\u781A\u53F0\uFF1A${MODE_NOTICE[next]}`);
+    if (next === "english" && Date.now() - this.lastSystemImeAt < IME_EVIDENCE_TTL_MS) {
+      this.lastImeWarnAt = Date.now();
+      new import_obsidian.Notice("\u63D0\u9192\uFF1A\u7CFB\u7EDF\u952E\u76D8\u521A\u624D\u5728\u7528\u4E2D\u6587\u8F93\u5165\u6CD5\u3002\u82F1\u6587\u6A21\u5F0F\u4E0D\u62E6\u622A\u6309\u952E\uFF0C\u7CFB\u7EDF\u662F\u4EC0\u4E48\u5C31\u6253\u51FA\u4EC0\u4E48\u2014\u2014\u9700\u8981\u7684\u8BDD\u6309 Ctrl+\u7A7A\u683C \u5207\u5230\u82F1\u6587 ABC\u3002", 8e3);
+    }
   }
   updateStatus(override) {
     const active = this.mode !== "english" && this.ready;
