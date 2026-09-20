@@ -1,0 +1,628 @@
+import { App, MarkdownView, Modal, Notice, Platform, Plugin, requestUrl, setIcon } from "obsidian";
+import workerSource from "./vendor/my-rime-worker.txt";
+
+const PLUGIN_VERSION = "0.4.0";
+const PROBE_URL = "https://cdn.jsdelivr.net/npm/@libreservice/my-rime@0.10.9/dist/rime.js";
+const INIT_TIMEOUT_MS = 45000;
+const MAX_TRACE = 24;
+
+type Candidate = { text: string; comment?: string };
+type RimeResult = {
+  state: 0 | 1 | 2 | 3;
+  committed?: string;
+  head?: string;
+  body?: string;
+  tail?: string;
+  page?: number;
+  isLastPage?: boolean;
+  highlighted?: number;
+  selectLabels?: string[];
+  candidates?: Candidate[];
+  updatedSchema?: string;
+};
+
+type PendingCall = {
+  resolve: (value: unknown) => void;
+  reject: (reason: Error) => void;
+};
+
+type Logger = (message: string) => void;
+
+function timeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} 超时（${Math.round(ms / 1000)} 秒无响应）`)), ms);
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (error) => { clearTimeout(timer); reject(error); }
+    );
+  });
+}
+
+class RimeWorkerClient {
+  private worker: Worker;
+  private workerUrl: string;
+  private pending?: PendingCall;
+  private chain: Promise<unknown> = Promise.resolve();
+  private fatal?: Error;
+
+  constructor(source: string, private log: Logger) {
+    // Electron exposes Node's `process` inside workers. Emscripten then tries to
+    // read the CDN URL with Node's fs module. Hide Node markers so the same
+    // upstream bundle takes its tested Web Worker/fetch path on desktop and iOS.
+    const browserWorkerSource = "self.process=undefined;self.require=undefined;\n" + source;
+    const blob = new Blob([browserWorkerSource], { type: "text/javascript" });
+    this.workerUrl = URL.createObjectURL(blob);
+    this.worker = new Worker(this.workerUrl);
+
+    this.worker.addEventListener("message", (event: MessageEvent) => {
+      const message = event.data;
+      if (message?.type === "control") {
+        this.log(`worker control: ${JSON.stringify(message.args ?? message.name ?? "")}`.slice(0, 200));
+        return;
+      }
+      const pending = this.pending;
+      this.pending = undefined;
+      if (!pending) return;
+      if (message?.type === "success") pending.resolve(message.result);
+      else pending.reject(new Error(message?.error?.message ?? "RIME Worker 调用失败"));
+    });
+
+    this.worker.addEventListener("error", (event: ErrorEvent) => {
+      // A blob worker that fails inside importScripts reports here, often with an
+      // empty message, so record every field the event carries.
+      const detail = [
+        event.message || "(无错误文本)",
+        event.filename ? `文件 ${event.filename}` : "",
+        event.lineno ? `行 ${event.lineno}:${event.colno ?? 0}` : ""
+      ].filter(Boolean).join(" · ");
+      const error = new Error(`RIME Worker 启动失败：${detail}`);
+      this.fatal = error;
+      this.log(`worker error → ${detail}`);
+      const pending = this.pending;
+      this.pending = undefined;
+      pending?.reject(error);
+    });
+
+    this.worker.addEventListener("messageerror", () => {
+      this.log("worker messageerror：消息无法反序列化");
+    });
+  }
+
+  call<T>(name: string, ...args: unknown[]): Promise<T> {
+    if (this.fatal) return Promise.reject(this.fatal);
+    const run = () => new Promise<T>((resolve, reject) => {
+      this.pending = {
+        resolve: (value) => resolve(value as T),
+        reject
+      };
+      this.worker.postMessage({ name, args, transferableIndices: [] });
+    });
+    const result = this.chain.then(run, run);
+    this.chain = result.catch(() => undefined);
+    return result;
+  }
+
+  destroy(): void {
+    this.worker.terminate();
+    URL.revokeObjectURL(this.workerUrl);
+  }
+}
+
+const KEY_MAP: Record<string, string> = {
+  Escape: "Escape",
+  Backspace: "BackSpace",
+  Delete: "Delete",
+  Tab: "Tab",
+  Enter: "Return",
+  ArrowUp: "Up",
+  ArrowRight: "Right",
+  ArrowDown: "Down",
+  ArrowLeft: "Left",
+  PageUp: "Page_Up",
+  PageDown: "Page_Down",
+  " ": "space",
+  ",": "comma",
+  ".": "period",
+  "?": "question",
+  "!": "exclam",
+  ";": "semicolon",
+  ":": "colon",
+  "'": "apostrophe"
+};
+
+const START_PUNCTUATION = new Set([",", ".", "?", "!", ";", ":"]);
+
+type SkipReason =
+  | "未启用"
+  | "引擎未就绪"
+  | "焦点不在编辑器"
+  | "带修饰键"
+  | "系统输入法组合中"
+  | "非拼音按键";
+
+class DiagnosticsModal extends Modal {
+  constructor(app: App, private report: string) {
+    super(app);
+  }
+
+  onOpen(): void {
+    const { contentEl } = this;
+    contentEl.addClass("rime-diag");
+    contentEl.createEl("h3", { text: "RIME 输入 · 诊断报告" });
+    contentEl.createEl("p", {
+      cls: "rime-diag-hint",
+      text: "复制这份报告发给协助排查的人，它记录了初始化每一步和按键捕获情况。"
+    });
+    const area = contentEl.createEl("textarea", { cls: "rime-diag-text" });
+    area.value = this.report;
+    area.readOnly = true;
+    area.rows = 18;
+
+    const actions = contentEl.createDiv({ cls: "rime-diag-actions" });
+    const copyButton = actions.createEl("button", { text: "复制报告", cls: "mod-cta" });
+    copyButton.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(this.report);
+        copyButton.setText("已复制");
+      } catch {
+        area.select();
+        const ok = document.execCommand("copy");
+        copyButton.setText(ok ? "已复制" : "复制失败，请手动选中");
+      }
+      setTimeout(() => copyButton.setText("复制报告"), 1600);
+    });
+    actions.createEl("button", { text: "关闭" }).addEventListener("click", () => this.close());
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+  }
+}
+
+export default class RimeInputPlugin extends Plugin {
+  private client?: RimeWorkerClient;
+  private enabled = true;
+  private ready = false;
+  private composing = false;
+  private panel?: HTMLDivElement;
+  private preedit?: HTMLDivElement;
+  private candidates?: HTMLDivElement;
+  private status?: HTMLElement;
+  private ribbon?: HTMLElement;
+  private inputSequence = 0;
+  private discardThrough = 0;
+
+  private startedAt = Date.now();
+  private diagnostics: string[] = [];
+  private initError?: string;
+  private keydownSeen = 0;
+  private keydownCaptured = 0;
+  private skipCounts: Partial<Record<SkipReason, number>> = {};
+  private lastKeyNote = "(尚未按键)";
+  private eventTrace: string[] = [];
+  private eventCounts: Record<string, number> = {};
+  private pendingTrace = -1;
+  private shiftArmed = false;
+  private imeConflictStreak = 0;
+
+  async onload(): Promise<void> {
+    this.log(`插件 ${PLUGIN_VERSION} 载入`);
+    this.log(this.environmentLine());
+
+    this.createPanel();
+    this.registerCommands();
+    this.createControls();
+    this.registerDomEvent(document, "keydown", (event) => this.onKeydown(event), true);
+    this.registerDomEvent(document, "keyup", (event) => this.onKeyup(event), true);
+    this.registerInputProbes();
+    this.updateStatus("正在加载…");
+
+    try {
+      await this.probeNetwork();
+
+      const t0 = Date.now();
+      this.client = new RimeWorkerClient(workerSource, (message) => this.log(message));
+      this.log(`Worker 已创建（${Date.now() - t0}ms）`);
+
+      const t1 = Date.now();
+      await timeout(this.client.call<void>("setIME", "pinyin_simp"), INIT_TIMEOUT_MS, "加载 RIME 引擎与词库");
+      this.log(`setIME(pinyin_simp) 完成（${Date.now() - t1}ms）`);
+
+      await timeout(this.client.call<void>("setPageSize", 7), 10000, "设置候选页大小");
+      this.log("setPageSize(7) 完成");
+
+      this.ready = true;
+      this.updateStatus();
+      this.log(`就绪，总耗时 ${Date.now() - this.startedAt}ms`);
+      new Notice("RIME 中文输入已就绪；请把系统键盘切到英文 ABC");
+    } catch (error) {
+      const message = this.errorMessage(error);
+      this.initError = message;
+      this.log(`初始化失败：${message}`);
+      console.error("RIME initialization failed", error);
+      this.updateStatus("加载失败");
+      new Notice(`RIME 加载失败：${message}\n请运行命令「RIME 输入：诊断报告」查看详情`, 15000);
+    }
+  }
+
+  onunload(): void {
+    this.client?.destroy();
+    this.panel?.remove();
+  }
+
+  /* ---------------- diagnostics ---------------- */
+
+  private log(message: string): void {
+    const stamp = String(Date.now() - this.startedAt).padStart(6, " ");
+    this.diagnostics.push(`[+${stamp}ms] ${message}`);
+  }
+
+  private environmentLine(): string {
+    const kind = Platform.isIosApp ? "iOS/iPadOS App"
+      : Platform.isAndroidApp ? "Android App"
+      : Platform.isMacOS ? "macOS 桌面"
+      : Platform.isWin ? "Windows 桌面"
+      : "其它";
+    return `环境：${kind}｜mobile=${Platform.isMobile}｜Obsidian ${(this.app as unknown as { appVersion?: string }).appVersion ?? "?"}`;
+  }
+
+  /** Separates "the CDN is unreachable" from "the page context is not allowed to fetch it". */
+  private async probeNetwork(): Promise<void> {
+    this.log(`navigator.onLine = ${navigator.onLine}`);
+    try {
+      const res = await timeout(requestUrl({ url: PROBE_URL, method: "GET" }), 15000, "网络探测(requestUrl)");
+      this.log(`requestUrl 探测 → HTTP ${res.status}，${res.arrayBuffer.byteLength} 字节`);
+    } catch (error) {
+      this.log(`requestUrl 探测失败 → ${this.errorMessage(error)}`);
+    }
+    try {
+      const res = await timeout(fetch(PROBE_URL, { method: "GET" }), 15000, "网络探测(fetch)");
+      this.log(`fetch 探测 → HTTP ${res.status} ${res.ok ? "ok" : "not ok"}`);
+    } catch (error) {
+      this.log(`fetch 探测失败 → ${this.errorMessage(error)}（若 requestUrl 成功而此处失败，说明是页面安全策略拦截，不是网络问题）`);
+    }
+  }
+
+  /* 被动事件探针：只记录，不改变任何行为。用于在 iPad 上看清系统键盘到底发什么事件。 */
+
+  private registerInputProbes(): void {
+    const types = ["beforeinput", "input", "compositionstart", "compositionupdate", "compositionend"];
+    for (const type of types) {
+      const handler = (event: Event): void => {
+        if (!this.isEditorTarget(event.target)) return;
+        this.trace(type, this.describeEvent(event));
+      };
+      document.addEventListener(type, handler, true);
+      this.register(() => document.removeEventListener(type, handler, true));
+    }
+  }
+
+  private describeEvent(event: Event): string {
+    const input = event as InputEvent;
+    if (typeof input.inputType === "string") {
+      return `inputType="${input.inputType}" data=${JSON.stringify(input.data)} comp=${input.isComposing}`;
+    }
+    const composition = event as CompositionEvent;
+    if (typeof composition.data === "string") return `data=${JSON.stringify(composition.data)}`;
+    return "";
+  }
+
+  private trace(kind: string, detail: string): number {
+    this.eventCounts[kind] = (this.eventCounts[kind] ?? 0) + 1;
+    const stamp = String(Date.now() - this.startedAt).padStart(6, " ");
+    this.eventTrace.push(`[+${stamp}ms] ${kind} ${detail}`);
+    if (this.eventTrace.length > MAX_TRACE) this.eventTrace.shift();
+    return this.eventTrace.length - 1;
+  }
+
+  private markTrace(index: number, marker: string): void {
+    if (index < 0 || index >= this.eventTrace.length) return;
+    this.eventTrace[index] += ` → ${marker}`;
+  }
+
+  private buildReport(): string {
+    const skips = Object.entries(this.skipCounts)
+      .sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0))
+      .map(([reason, count]) => `    ${reason}: ${count}`)
+      .join("\n") || "    (无)";
+
+    const counts = Object.entries(this.eventCounts)
+      .map(([kind, n]) => `  ${kind}: ${n}`)
+      .join("\n") || "  (无)";
+
+    const trace = this.eventTrace.length
+      ? this.eventTrace.map((line) => `  ${line}`).join("\n")
+      : "  (无)";
+
+    return [
+      "RIME 输入 · 诊断报告",
+      `生成时间：${new Date().toLocaleString()}`,
+      `插件版本：${PLUGIN_VERSION}`,
+      this.environmentLine(),
+      `UA：${navigator.userAgent}`,
+      "",
+      "--- 当前状态 ---",
+      `  引擎就绪 ready = ${this.ready}`,
+      `  中文输入 enabled = ${this.enabled}`,
+      `  组合中 composing = ${this.composing}`,
+      `  初始化错误 = ${this.initError ?? "(无)"}`,
+      "",
+      "--- 按键捕获 ---",
+      `  收到 keydown：${this.keydownSeen}`,
+      `  被 RIME 截获：${this.keydownCaptured}`,
+      `  最近一次按键：${this.lastKeyNote}`,
+      "  未截获原因统计：",
+      skips,
+      "",
+      "--- 事件计数 ---",
+      counts,
+      "",
+      `--- 最近事件轨迹（最多 ${MAX_TRACE} 条）---`,
+      trace,
+      "",
+      "--- 初始化过程 ---",
+      ...this.diagnostics
+    ].join("\n");
+  }
+
+  /* ---------------- UI ---------------- */
+
+  private registerCommands(): void {
+    this.addCommand({
+      id: "toggle-rime-input",
+      name: "切换 RIME 中文输入",
+      hotkeys: [{ modifiers: ["Mod", "Shift"], key: "Space" }],
+      callback: () => this.toggle()
+    });
+    this.addCommand({
+      id: "rime-diagnostics",
+      name: "诊断报告",
+      callback: () => new DiagnosticsModal(this.app, this.buildReport()).open()
+    });
+  }
+
+  private createControls(): void {
+    // Obsidian mobile has no status bar, so the ribbon carries the state there.
+    this.ribbon = this.addRibbonIcon("languages", "切换 RIME 中文输入", () => this.toggle());
+    if (!Platform.isMobile) {
+      this.status = this.addStatusBarItem();
+      this.status.addClass("rime-input-status");
+      this.status.addEventListener("click", () => this.toggle());
+    }
+  }
+
+  private toggle(): void {
+    this.enabled = !this.enabled;
+    if (!this.enabled) this.cancelComposition();
+    this.updateStatus();
+    new Notice(this.enabled ? "RIME 中文输入：开（系统键盘请用英文 ABC）" : "RIME 中文输入：关");
+  }
+
+  private updateStatus(override?: string): void {
+    const label = override ?? (this.enabled ? "RIME 中" : "RIME 英");
+    if (this.status) {
+      this.status.setText(label);
+      this.status.toggleClass("is-enabled", this.enabled && this.ready);
+    }
+    if (this.ribbon) {
+      this.ribbon.toggleClass("is-enabled", this.enabled && this.ready);
+      this.ribbon.setAttribute("aria-label", `RIME 中文输入：${this.enabled ? "开" : "关"}`);
+      setIcon(this.ribbon, this.enabled && this.ready ? "languages" : "type");
+    }
+  }
+
+  private createPanel(): void {
+    this.panel = document.body.createDiv({ cls: "rime-input-panel" });
+    this.panel.setAttribute("aria-live", "polite");
+    this.preedit = this.panel.createDiv({ cls: "rime-input-preedit" });
+    this.candidates = this.panel.createDiv({ cls: "rime-input-candidates" });
+  }
+
+  /* ---------------- input ---------------- */
+
+  private isEditorTarget(target: EventTarget | null): boolean {
+    return target instanceof Element && Boolean(target.closest(".markdown-source-view .cm-content"));
+  }
+
+  private activeEditor(): MarkdownView | null {
+    return this.app.workspace.getActiveViewOfType(MarkdownView);
+  }
+
+  private skip(reason: SkipReason): false {
+    this.skipCounts[reason] = (this.skipCounts[reason] ?? 0) + 1;
+    // 插件开着、键却被系统输入法吃掉时，沉默看起来就像插件坏了。连续几次就说一声。
+    if (reason === "系统输入法组合中") {
+      this.imeConflictStreak += 1;
+      if (this.imeConflictStreak === 3 && this.enabled) {
+        new Notice("系统输入法正在接管按键，RIME 收不到输入。请把系统键盘切到英文 ABC。", 8000);
+      }
+    }
+    this.markTrace(this.pendingTrace, reason);
+    this.pendingTrace = -1;
+    return false;
+  }
+
+  private shouldCapture(event: KeyboardEvent): boolean {
+    if (!this.enabled) return this.skip("未启用");
+    if (!this.ready || !this.client) return this.skip("引擎未就绪");
+    if (!this.isEditorTarget(event.target)) return this.skip("焦点不在编辑器");
+    // The system IME is still composing (it was left on a Chinese layout). Letting
+    // RIME also consume the key commits the same word twice.
+    if (event.isComposing || event.keyCode === 229) return this.skip("系统输入法组合中");
+    if (event.metaKey || event.ctrlKey || event.altKey) return this.skip("带修饰键");
+    if (event.shiftKey && event.key.length !== 1) return this.skip("带修饰键");
+    if (this.composing) {
+      return /^[a-z0-9]$/i.test(event.key) || event.key in KEY_MAP ? true : this.skip("非拼音按键");
+    }
+    if (event.shiftKey) return this.skip("带修饰键");
+    return /^[a-z]$/i.test(event.key) || START_PUNCTUATION.has(event.key) ? true : this.skip("非拼音按键");
+  }
+
+  /* 单独按下并松开 Shift（中间没有别的键）＝ 中/英切换，沿用 RIME 的习惯。 */
+  private onKeyup(event: KeyboardEvent): void {
+    if (event.key !== "Shift" || !this.shiftArmed) return;
+    this.shiftArmed = false;
+    if (!this.ready || !this.isEditorTarget(event.target)) return;
+    this.toggle();
+  }
+
+  private onKeydown(event: KeyboardEvent): void {
+    this.shiftArmed = event.key === "Shift" && !event.ctrlKey && !event.metaKey && !event.altKey;
+    this.keydownSeen += 1;
+    const target = event.target instanceof Element ? event.target.className.toString().slice(0, 60) : String(event.target);
+    this.lastKeyNote = `key="${event.key}" code="${event.code}" keyCode=${event.keyCode} isComposing=${event.isComposing} target=[${target}]`;
+    this.pendingTrace = this.trace("keydown", `key=${JSON.stringify(event.key)} code="${event.code}" kc=${event.keyCode} comp=${event.isComposing}`);
+
+    if (!this.shouldCapture(event)) return;
+    const view = this.activeEditor();
+    if (!view) return this.skip("焦点不在编辑器") as unknown as void;
+
+    const rimeKey = this.toRimeKey(event);
+    if (!rimeKey) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    this.keydownCaptured += 1;
+    this.imeConflictStreak = 0;
+    this.markTrace(this.pendingTrace, "截获");
+    this.pendingTrace = -1;
+
+    const sequence = ++this.inputSequence;
+    void this.client!.call<RimeResult>("process", rimeKey)
+      .then((result) => this.applyResult(result, event.key, view, sequence))
+      .catch((error) => {
+        console.error("RIME input failed", error);
+        this.log(`process("${rimeKey}") 失败：${this.errorMessage(error)}`);
+        this.cancelComposition();
+        new Notice(`RIME 输入失败：${this.errorMessage(error)}`);
+      });
+  }
+
+  private toRimeKey(event: KeyboardEvent): string | undefined {
+    if (/^[a-z0-9]$/i.test(event.key)) return event.key.toLowerCase();
+    const mapped = KEY_MAP[event.key];
+    return mapped ? `{${mapped}}` : undefined;
+  }
+
+  private applyResult(result: RimeResult, originalKey: string, view: MarkdownView, sequence: number): void {
+    if (sequence <= this.discardThrough) return;
+    if (result.state === 0) {
+      this.composing = false;
+      if (result.committed) view.editor.replaceSelection(result.committed);
+      this.hidePanel();
+      return;
+    }
+    if (result.state === 1) {
+      this.composing = true;
+      if (result.committed) view.editor.replaceSelection(result.committed);
+      this.renderPanel(result, view);
+      return;
+    }
+    this.composing = false;
+    this.hidePanel();
+    if (result.state === 3 && originalKey.length === 1) view.editor.replaceSelection(originalKey);
+  }
+
+  /* 候选栏跟随光标。取不到光标位置时退回底部居中。 */
+  private caretRect(view: MarkdownView): { left: number; top: number; bottom: number } | null {
+    const cm = (view.editor as unknown as {
+      cm?: {
+        coordsAtPos?(pos: number): { left: number; top: number; bottom: number } | null;
+        state?: { selection: { main: { head: number } } };
+      };
+    }).cm;
+    const head = cm?.state?.selection.main.head;
+    if (cm?.coordsAtPos && typeof head === "number") {
+      const coords = cm.coordsAtPos(head);
+      if (coords) return coords;
+    }
+    const selection = window.getSelection();
+    if (selection?.rangeCount) {
+      const rect = selection.getRangeAt(0).getBoundingClientRect();
+      if (rect.top || rect.left) return { left: rect.left, top: rect.top, bottom: rect.bottom };
+    }
+    return null;
+  }
+
+  private positionPanel(view: MarkdownView): void {
+    const panel = this.panel;
+    if (!panel) return;
+    const caret = this.caretRect(view);
+    if (!caret) {
+      panel.removeClass("is-anchored");
+      panel.style.removeProperty("left");
+      panel.style.removeProperty("top");
+      return;
+    }
+
+    panel.addClass("is-anchored");
+    // visualViewport 在 iPadOS 上会随软键盘收缩，用它才能避开被键盘盖住。
+    const vv = window.visualViewport;
+    const minX = vv ? vv.offsetLeft : 0;
+    const minY = vv ? vv.offsetTop : 0;
+    const maxX = minX + (vv ? vv.width : window.innerWidth);
+    const maxY = minY + (vv ? vv.height : window.innerHeight);
+    const gap = 6;
+    const margin = 8;
+
+    const width = panel.offsetWidth;
+    const height = panel.offsetHeight;
+
+    let left = caret.left;
+    if (left + width > maxX - margin) left = maxX - margin - width;
+    if (left < minX + margin) left = minX + margin;
+
+    let top = caret.bottom + gap;
+    if (top + height > maxY - margin) top = caret.top - gap - height;
+    if (top < minY + margin) top = minY + margin;
+
+    panel.style.left = `${Math.round(left)}px`;
+    panel.style.top = `${Math.round(top)}px`;
+  }
+
+  private renderPanel(result: RimeResult, view: MarkdownView): void {
+    if (!this.panel || !this.preedit || !this.candidates) return;
+    const head = result.head ?? "";
+    const body = result.body ?? "";
+    const tail = result.tail ?? "";
+    this.preedit.setText(`${head}${body}${tail}`);
+    this.candidates.empty();
+    (result.candidates ?? []).forEach((candidate, index) => {
+      const label = result.selectLabels?.[index] ?? String(index + 1);
+      const button = this.candidates!.createEl("button", {
+        cls: index === result.highlighted ? "is-highlighted" : "",
+        text: `${label} ${candidate.text}${candidate.comment ? ` ${candidate.comment}` : ""}`,
+        attr: { type: "button" }
+      });
+      button.addEventListener("pointerdown", (event) => event.preventDefault());
+      button.addEventListener("click", () => {
+        void this.client!.call<string>("selectCandidateOnCurrentPage", index)
+          .then((raw) => this.applyResult(JSON.parse(raw) as RimeResult, "", view, ++this.inputSequence));
+      });
+    });
+    this.positionPanel(view);
+    this.panel.addClass("is-visible");
+  }
+
+  private cancelComposition(): void {
+    this.composing = false;
+    this.discardThrough = this.inputSequence;
+    this.hidePanel();
+    if (this.ready && this.client) void this.client.call<RimeResult>("process", "{Escape}");
+  }
+
+  private hidePanel(): void {
+    this.panel?.removeClass("is-visible");
+    this.preedit?.setText("");
+    this.candidates?.empty();
+  }
+
+  private errorMessage(error: unknown): string {
+    if (error instanceof Error) return error.message;
+    if (typeof error === "object" && error !== null) {
+      const maybe = error as { message?: string; status?: number };
+      if (maybe.message) return maybe.message;
+      if (maybe.status) return `HTTP ${maybe.status}`;
+    }
+    return String(error);
+  }
+}
