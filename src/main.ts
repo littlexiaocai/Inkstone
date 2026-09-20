@@ -2,13 +2,14 @@ import { App, MarkdownView, Modal, Notice, Platform, Plugin, requestUrl, setIcon
 import workerSource from "./vendor/my-rime-worker.txt";
 import { searchEmoji, type EmojiEntry } from "./emoji";
 
-const PLUGIN_VERSION = "0.7.9";
+const PLUGIN_VERSION = "0.7.10";
 const PROBE_URL = "https://cdn.jsdelivr.net/npm/@libreservice/my-rime@0.10.9/dist/rime.js";
 const INIT_TIMEOUT_MS = 45000;
 const MAX_TRACE = 60;
 const REPORT_FOLDER = "砚台诊断";
 // 同一条提醒的最短间隔，以及「系统输入法刚才在工作」这条证据的有效期。
 const IME_WARN_COOLDOWN_MS = 30 * 1000;
+const READY_HINT = "砚台输入法已就绪——按 Shift 在中英文之间切换";
 const CJK = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/;
 const EMOJI_PAGE = 7;
 
@@ -224,6 +225,7 @@ export default class InkstonePlugin extends Plugin {
   private shiftArmed = false;
   private imeConflictStreak = 0;
   private lastImeWarnAt = 0;
+  private imeTookOver = false;
   private traceEnabled = false;
   private traceRawKeys = false;
 
@@ -254,7 +256,7 @@ export default class InkstonePlugin extends Plugin {
       this.ready = true;
       this.updateStatus();
       this.log(`就绪，总耗时 ${Date.now() - this.startedAt}ms`);
-      new Notice("砚台输入法已就绪");
+      new Notice(READY_HINT);
     } catch (error) {
       const message = this.errorMessage(error);
       this.initError = message;
@@ -344,6 +346,7 @@ export default class InkstonePlugin extends Plugin {
      两条触发路径共用这一条文案：中文模式下按键被 229 连续跳过，以及任何模式下
      系统输入法上屏了汉字。同一种处境，不该有两种说法。 */
   private warnSystemImeTookOver(): void {
+    this.imeTookOver = true;
     if (Date.now() - this.lastImeWarnAt < IME_WARN_COOLDOWN_MS) return;
     this.lastImeWarnAt = Date.now();
     new Notice("系统键盘切到中文了，砚台已停止工作——按键现在归系统输入法。要继续用砚台，请把系统键盘切回英文 ABC。", 8000);
@@ -688,12 +691,28 @@ export default class InkstonePlugin extends Plugin {
     this.pendingTrace = -1;
   }
 
+  /* 「砚台停了」有提示，「砚台回来了」也得有，否则用户不知道什么时候能接着用。
+     插件查不到系统输入源，但能从按键反推：系统中文输入法在工作时，按键到达这里
+     是 keyCode 229 / isComposing；一旦有正常字符键落进编辑器，就说明系统交还了
+     控制权。只在确实被接管过之后报一次，平时不啰嗦。 */
+  private noteImeReleased(event: KeyboardEvent): void {
+    if (!this.imeTookOver) return;
+    if (event.isComposing || event.keyCode === 229) return;
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+    if (event.key.length !== 1) return;
+    if (!this.isEditorTarget(event.target)) return;
+    this.imeTookOver = false;
+    new Notice(READY_HINT, 6000);
+  }
+
   private onKeydown(event: KeyboardEvent): void {
     this.shiftArmed = event.key === "Shift" && !event.ctrlKey && !event.metaKey && !event.altKey;
     this.keydownSeen += 1;
     const target = event.target instanceof Element ? event.target.className.toString().slice(0, 60) : String(event.target);
     this.lastKeyNote = `key=${this.redactKey(event.key)} code=${this.redactCode(event.code)} keyCode=${this.redactKeyCode(event.keyCode)} isComposing=${event.isComposing} target=[${target}]`;
     this.pendingTrace = this.trace("keydown", `key=${this.redactKey(event.key)} code=${this.redactCode(event.code)} kc=${this.redactKeyCode(event.keyCode)} comp=${event.isComposing} @${this.targetTag(event.target)}`);
+
+    this.noteImeReleased(event);
 
     if (this.isPickerChar(event)) {
       this.insertPickerChar(event);
