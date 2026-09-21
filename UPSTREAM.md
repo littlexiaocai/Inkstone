@@ -1,6 +1,6 @@
 # Upstream components
 
-Inkstone (砚台输入法) does not fetch anything at runtime. The RIME engine and the
+Inkstone IME (砚台输入法) does not fetch anything at runtime. The RIME engine and the
 pinyin schemas are bundled into `main.js` at build time, which means this
 repository and every release **redistribute** the upstream artifacts listed below.
 
@@ -16,7 +16,7 @@ the npm package's `dist/worker.js`. Its engine files (`rime.js`, `rime.wasm`,
 `scripts/fetch-assets.mjs`; their source URLs and sha256 digests are recorded in
 `src/assets/ASSETS.json`.
 
-The Worker is embedded verbatim. Inkstone does not patch it: a resolver injected
+The Worker is embedded verbatim. Inkstone IME does not patch it: a resolver injected
 ahead of it rewrites the two resource entry points (`importScripts` and `fetch`)
 to local Blob URLs, and fails loudly rather than falling back to the network.
 
