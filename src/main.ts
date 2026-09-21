@@ -251,7 +251,7 @@ interface JustTypeSettings {
 
 const DEFAULT_SETTINGS: JustTypeSettings = { toggleKey: "Shift" };
 
-const MODE_LABEL: Record<InputMode, string> = { chinese: "就打个字 中", english: "就打个字 英", emoji: "就打个字 😀" };
+const MODE_LABEL: Record<InputMode, string> = { chinese: "Just Type 中", english: "Just Type 英", emoji: "Just Type 😀" };
 const MODE_NOTICE: Record<InputMode, string> = {
   chinese: "中文",
   english: "英文",
@@ -299,7 +299,7 @@ class DiagnosticsModal extends Modal {
   onOpen(): void {
     const { contentEl } = this;
     contentEl.addClass("just-type-diag");
-    contentEl.createEl("h3", { text: "就打个字 · 诊断报告" });
+    contentEl.createEl("h3", { text: "Just Type · 诊断报告" });
     contentEl.createEl("p", {
       cls: "just-type-diag-hint",
       text: this.sensitive
@@ -411,7 +411,7 @@ export default class JustTypePlugin extends Plugin {
       this.log(`初始化失败：${message}`);
       console.error("RIME initialization failed", error);
       this.updateStatus("加载失败");
-      new Notice(`就打个字加载失败：${message}\n运行命令「诊断报告 (report)」查看详情`, 15000);
+      new Notice(`Just Type 加载失败：${message}\n运行命令「诊断报告 (report)」查看详情`, 15000);
     }
   }
 
@@ -482,7 +482,7 @@ export default class JustTypePlugin extends Plugin {
     this.imeTookOver = true;
     if (Date.now() - this.lastImeWarnAt < IME_WARN_COOLDOWN_MS) return;
     this.lastImeWarnAt = Date.now();
-    new Notice("系统键盘切到中文了，就打个字已停止工作——按键现在归系统输入法。要继续用就打个字，请把系统键盘切回英文 ABC。", 8000);
+    new Notice("系统键盘切到中文了，Just Type 已停止工作——按键现在归系统输入法。要继续用 Just Type，请把系统键盘切回英文 ABC。", 8000);
   }
 
   private describeEvent(event: Event): string {
@@ -535,8 +535,8 @@ export default class JustTypePlugin extends Plugin {
   private readyHint(): string {
     const key = this.settings.toggleKey;
     return key === "none"
-      ? "就打个字已就绪——用命令「切换中英文 (toggle)」或点状态栏切换"
-      : `就打个字已就绪——按 ${TOGGLE_KEY_LABEL[key]} 在中英文之间切换`;
+      ? "Just Type 已就绪——用命令「切换中英文 (toggle)」或点状态栏切换"
+      : `Just Type 已就绪——按 ${TOGGLE_KEY_LABEL[key]} 在中英文之间切换`;
   }
 
   private targetTag(target: EventTarget | null): string {
@@ -600,7 +600,7 @@ export default class JustTypePlugin extends Plugin {
       : "  (无)";
 
     return [
-      "就打个字 · 诊断报告",
+      "Just Type · 诊断报告",
       `生成时间：${new Date().toLocaleString()}`,
       `插件版本：${PLUGIN_VERSION}`,
       this.environmentLine(),
@@ -618,7 +618,7 @@ export default class JustTypePlugin extends Plugin {
       "",
       "--- 按键捕获 ---",
       `  收到 keydown：${this.keydownSeen}`,
-      `  被就打个字截获：${this.keydownCaptured}`,
+      `  被 Just Type 截获：${this.keydownCaptured}`,
       `  最近一次按键：${this.lastKeyNote}`,
       "  未截获原因统计：",
       skips,
@@ -693,7 +693,7 @@ export default class JustTypePlugin extends Plugin {
 
   private createControls(): void {
     // Obsidian mobile has no status bar, so the ribbon carries the state there.
-    this.ribbon = this.addRibbonIcon("languages", "就打个字：切换中英文", () => this.toggle());
+    this.ribbon = this.addRibbonIcon("languages", "Just Type：切换中英文", () => this.toggle());
     if (!Platform.isMobile) {
       this.status = this.addStatusBarItem();
       this.status.addClass("just-type-status");
@@ -721,7 +721,7 @@ export default class JustTypePlugin extends Plugin {
       const view = this.activeEditor();
       if (view) this.renderEmojiPanel(view);
     }
-    new Notice(`就打个字：${MODE_NOTICE[next]}`);
+    new Notice(`Just Type：${MODE_NOTICE[next]}`);
   }
 
   private updateStatus(override?: string): void {
@@ -733,7 +733,7 @@ export default class JustTypePlugin extends Plugin {
     }
     if (this.ribbon) {
       this.ribbon.toggleClass("is-enabled", active);
-      this.ribbon.setAttribute("aria-label", `就打个字：${MODE_NOTICE[this.mode]}`);
+      this.ribbon.setAttribute("aria-label", `Just Type：${MODE_NOTICE[this.mode]}`);
       setIcon(this.ribbon, this.mode === "emoji" ? "smile" : this.mode === "chinese" && this.ready ? "languages" : "type");
     }
   }
@@ -892,7 +892,7 @@ export default class JustTypePlugin extends Plugin {
         console.error("RIME input failed", error);
         this.log(`process("${rimeKey}") 失败：${this.errorMessage(error)}`);
         this.cancelComposition();
-        new Notice(`就打个字输入失败：${this.errorMessage(error)}\n可运行命令「诊断报告 (report)」查看详情`, 8000);
+        new Notice(`Just Type 输入失败：${this.errorMessage(error)}\n可运行命令「诊断报告 (report)」查看详情`, 8000);
       });
   }
 

@@ -590,7 +590,7 @@ var TOGGLE_KEY_LABEL = {
   none: "\u5173\u95ED\uFF08\u53EA\u7528\u547D\u4EE4\u6216\u72B6\u6001\u680F\u5207\u6362\uFF09"
 };
 var DEFAULT_SETTINGS = { toggleKey: "Shift" };
-var MODE_LABEL = { chinese: "\u5C31\u6253\u4E2A\u5B57 \u4E2D", english: "\u5C31\u6253\u4E2A\u5B57 \u82F1", emoji: "\u5C31\u6253\u4E2A\u5B57 \u{1F600}" };
+var MODE_LABEL = { chinese: "Just Type \u4E2D", english: "Just Type \u82F1", emoji: "Just Type \u{1F600}" };
 var MODE_NOTICE = {
   chinese: "\u4E2D\u6587",
   english: "\u82F1\u6587",
@@ -625,7 +625,7 @@ var DiagnosticsModal = class extends import_obsidian.Modal {
   onOpen() {
     const { contentEl } = this;
     contentEl.addClass("just-type-diag");
-    contentEl.createEl("h3", { text: "\u5C31\u6253\u4E2A\u5B57 \xB7 \u8BCA\u65AD\u62A5\u544A" });
+    contentEl.createEl("h3", { text: "Just Type \xB7 \u8BCA\u65AD\u62A5\u544A" });
     contentEl.createEl("p", {
       cls: "just-type-diag-hint",
       text: this.sensitive ? "\u26A0\uFE0F \u672C\u6B21\u8BB0\u5F55\u5305\u542B\u4F60\u5B9E\u9645\u6572\u4E0B\u7684\u6309\u952E\u5185\u5BB9\u3002\u5916\u53D1\u524D\u8BF7\u5148\u901A\u8BFB\u4E00\u904D\u3002" : "\u53EF\u4EE5\u628A\u8FD9\u4EFD\u62A5\u544A\u53D1\u7ED9\u534F\u52A9\u6392\u67E5\u7684\u4EBA\u3002\u6309\u952E\u5185\u5BB9\u5DF2\u8131\u654F\uFF0C\u53EA\u4FDD\u7559\u7C7B\u522B\uFF08\u5B57\u6BCD/\u6570\u5B57/\u7B26\u53F7\uFF09\u3002"
@@ -720,7 +720,7 @@ var JustTypePlugin = class extends import_obsidian.Plugin {
       this.log(`\u521D\u59CB\u5316\u5931\u8D25\uFF1A${message}`);
       console.error("RIME initialization failed", error);
       this.updateStatus("\u52A0\u8F7D\u5931\u8D25");
-      new import_obsidian.Notice(`\u5C31\u6253\u4E2A\u5B57\u52A0\u8F7D\u5931\u8D25\uFF1A${message}
+      new import_obsidian.Notice(`Just Type \u52A0\u8F7D\u5931\u8D25\uFF1A${message}
 \u8FD0\u884C\u547D\u4EE4\u300C\u8BCA\u65AD\u62A5\u544A (report)\u300D\u67E5\u770B\u8BE6\u60C5`, 15e3);
     }
   }
@@ -779,7 +779,7 @@ var JustTypePlugin = class extends import_obsidian.Plugin {
     this.imeTookOver = true;
     if (Date.now() - this.lastImeWarnAt < IME_WARN_COOLDOWN_MS) return;
     this.lastImeWarnAt = Date.now();
-    new import_obsidian.Notice("\u7CFB\u7EDF\u952E\u76D8\u5207\u5230\u4E2D\u6587\u4E86\uFF0C\u5C31\u6253\u4E2A\u5B57\u5DF2\u505C\u6B62\u5DE5\u4F5C\u2014\u2014\u6309\u952E\u73B0\u5728\u5F52\u7CFB\u7EDF\u8F93\u5165\u6CD5\u3002\u8981\u7EE7\u7EED\u7528\u5C31\u6253\u4E2A\u5B57\uFF0C\u8BF7\u628A\u7CFB\u7EDF\u952E\u76D8\u5207\u56DE\u82F1\u6587 ABC\u3002", 8e3);
+    new import_obsidian.Notice("\u7CFB\u7EDF\u952E\u76D8\u5207\u5230\u4E2D\u6587\u4E86\uFF0CJust Type \u5DF2\u505C\u6B62\u5DE5\u4F5C\u2014\u2014\u6309\u952E\u73B0\u5728\u5F52\u7CFB\u7EDF\u8F93\u5165\u6CD5\u3002\u8981\u7EE7\u7EED\u7528 Just Type\uFF0C\u8BF7\u628A\u7CFB\u7EDF\u952E\u76D8\u5207\u56DE\u82F1\u6587 ABC\u3002", 8e3);
   }
   describeEvent(event) {
     const input = event;
@@ -824,7 +824,7 @@ var JustTypePlugin = class extends import_obsidian.Plugin {
      焦点信息就丢了。轨迹里单独带一份，排查时才看得出按键到底落在哪。 */
   readyHint() {
     const key = this.settings.toggleKey;
-    return key === "none" ? "\u5C31\u6253\u4E2A\u5B57\u5DF2\u5C31\u7EEA\u2014\u2014\u7528\u547D\u4EE4\u300C\u5207\u6362\u4E2D\u82F1\u6587 (toggle)\u300D\u6216\u70B9\u72B6\u6001\u680F\u5207\u6362" : `\u5C31\u6253\u4E2A\u5B57\u5DF2\u5C31\u7EEA\u2014\u2014\u6309 ${TOGGLE_KEY_LABEL[key]} \u5728\u4E2D\u82F1\u6587\u4E4B\u95F4\u5207\u6362`;
+    return key === "none" ? "Just Type \u5DF2\u5C31\u7EEA\u2014\u2014\u7528\u547D\u4EE4\u300C\u5207\u6362\u4E2D\u82F1\u6587 (toggle)\u300D\u6216\u70B9\u72B6\u6001\u680F\u5207\u6362" : `Just Type \u5DF2\u5C31\u7EEA\u2014\u2014\u6309 ${TOGGLE_KEY_LABEL[key]} \u5728\u4E2D\u82F1\u6587\u4E4B\u95F4\u5207\u6362`;
   }
   targetTag(target) {
     if (!(target instanceof Element)) return "none";
@@ -868,7 +868,7 @@ var JustTypePlugin = class extends import_obsidian.Plugin {
     const traceState = !this.traceEnabled ? "\u5173\uFF08\u8FD0\u884C\u547D\u4EE4\u300C\u8BCA\u65AD\uFF1A\u5F00\u59CB/\u505C\u6B62\u8BB0\u5F55\u6309\u952E\u4E8B\u4EF6\u300D\u5F00\u542F\uFF09" : this.traceRawKeys ? "\u5F00 \u2014 \u26A0\uFE0F \u542B\u539F\u59CB\u6309\u952E\u5185\u5BB9" : "\u5F00 \u2014 \u5DF2\u8131\u654F";
     const trace = this.eventTrace.length ? this.eventTrace.map((line) => `  ${line}`).join("\n") : "  (\u65E0)";
     return [
-      "\u5C31\u6253\u4E2A\u5B57 \xB7 \u8BCA\u65AD\u62A5\u544A",
+      "Just Type \xB7 \u8BCA\u65AD\u62A5\u544A",
       `\u751F\u6210\u65F6\u95F4\uFF1A${(/* @__PURE__ */ new Date()).toLocaleString()}`,
       `\u63D2\u4EF6\u7248\u672C\uFF1A${PLUGIN_VERSION}`,
       this.environmentLine(),
@@ -886,7 +886,7 @@ var JustTypePlugin = class extends import_obsidian.Plugin {
       "",
       "--- \u6309\u952E\u6355\u83B7 ---",
       `  \u6536\u5230 keydown\uFF1A${this.keydownSeen}`,
-      `  \u88AB\u5C31\u6253\u4E2A\u5B57\u622A\u83B7\uFF1A${this.keydownCaptured}`,
+      `  \u88AB Just Type \u622A\u83B7\uFF1A${this.keydownCaptured}`,
       `  \u6700\u8FD1\u4E00\u6B21\u6309\u952E\uFF1A${this.lastKeyNote}`,
       "  \u672A\u622A\u83B7\u539F\u56E0\u7EDF\u8BA1\uFF1A",
       skips,
@@ -953,7 +953,7 @@ var JustTypePlugin = class extends import_obsidian.Plugin {
     });
   }
   createControls() {
-    this.ribbon = this.addRibbonIcon("languages", "\u5C31\u6253\u4E2A\u5B57\uFF1A\u5207\u6362\u4E2D\u82F1\u6587", () => this.toggle());
+    this.ribbon = this.addRibbonIcon("languages", "Just Type\uFF1A\u5207\u6362\u4E2D\u82F1\u6587", () => this.toggle());
     if (!import_obsidian.Platform.isMobile) {
       this.status = this.addStatusBarItem();
       this.status.addClass("just-type-status");
@@ -978,7 +978,7 @@ var JustTypePlugin = class extends import_obsidian.Plugin {
       const view = this.activeEditor();
       if (view) this.renderEmojiPanel(view);
     }
-    new import_obsidian.Notice(`\u5C31\u6253\u4E2A\u5B57\uFF1A${MODE_NOTICE[next]}`);
+    new import_obsidian.Notice(`Just Type\uFF1A${MODE_NOTICE[next]}`);
   }
   updateStatus(override) {
     const active = this.mode !== "english" && this.ready;
@@ -989,7 +989,7 @@ var JustTypePlugin = class extends import_obsidian.Plugin {
     }
     if (this.ribbon) {
       this.ribbon.toggleClass("is-enabled", active);
-      this.ribbon.setAttribute("aria-label", `\u5C31\u6253\u4E2A\u5B57\uFF1A${MODE_NOTICE[this.mode]}`);
+      this.ribbon.setAttribute("aria-label", `Just Type\uFF1A${MODE_NOTICE[this.mode]}`);
       (0, import_obsidian.setIcon)(this.ribbon, this.mode === "emoji" ? "smile" : this.mode === "chinese" && this.ready ? "languages" : "type");
     }
   }
@@ -1123,7 +1123,7 @@ var JustTypePlugin = class extends import_obsidian.Plugin {
       console.error("RIME input failed", error);
       this.log(`process("${rimeKey}") \u5931\u8D25\uFF1A${this.errorMessage(error)}`);
       this.cancelComposition();
-      new import_obsidian.Notice(`\u5C31\u6253\u4E2A\u5B57\u8F93\u5165\u5931\u8D25\uFF1A${this.errorMessage(error)}
+      new import_obsidian.Notice(`Just Type \u8F93\u5165\u5931\u8D25\uFF1A${this.errorMessage(error)}
 \u53EF\u8FD0\u884C\u547D\u4EE4\u300C\u8BCA\u65AD\u62A5\u544A (report)\u300D\u67E5\u770B\u8BE6\u60C5`, 8e3);
     });
   }
