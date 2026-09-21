@@ -1,6 +1,6 @@
 # 第三方组件声明
 
-砚台（Inkstone IME）运行时不联网，RIME 引擎与拼音方案全部随 `main.js` 一起分发。
+就打个字（Just Type IME）运行时不联网，RIME 引擎与拼音方案全部随 `main.js` 一起分发。
 也就是说，本仓库和每一个 Release 都在**再分发**下列第三方作品，此文件记录它们的
 出处与许可证。
 
@@ -22,14 +22,14 @@
 - `THIRD_PARTY_LICENSE_rime-pinyin-simp.txt`（Apache-2.0）
 - `THIRD_PARTY_LICENSE_rime-stroke.txt`（LGPL-3.0）
 
-> `stroke` 是 `pinyin_simp` 的依赖，用于反引号触发的笔画反查。它是砚台内嵌体积
+> `stroke` 是 `pinyin_simp` 的依赖，用于反引号触发的笔画反查。它是就打个字内嵌体积
 > 最大的一块（原始 6.01 MB）。若将来决定去掉笔画反查，这一项及其许可证声明
 > 应一并移除。
 
 ## 通过 rime.wasm / rime.data 间接包含的组件
 
 `rime.js`、`rime.wasm` 和 `rime.data` 是 [My RIME](https://github.com/LibreService/my_rime)
-项目的 WebAssembly 构建产物，其中静态包含了下列上游库。砚台没有单独获取或修改
+项目的 WebAssembly 构建产物，其中静态包含了下列上游库。就打个字没有单独获取或修改
 它们，只是原样再分发 My RIME 的构建结果：
 
 - [librime](https://github.com/rime/librime) —— RIME 输入法引擎本体
@@ -41,8 +41,8 @@
 - [yaml-cpp](https://github.com/jbeder/yaml-cpp)
 
 这些组件各自的许可证以其上游项目的声明为准。My RIME 以 AGPL-3.0-or-later 分发
-其构建产物，砚台随之以同一许可证再分发。
+其构建产物，就打个字随之以同一许可证再分发。
 
-## 砚台自身
+## 就打个字自身
 
-砚台以 **AGPL-3.0-or-later** 发布，与其内嵌的 My RIME 一致。完整文本见 `LICENSE`。
+就打个字以 **AGPL-3.0-or-later** 发布，与其内嵌的 My RIME 一致。完整文本见 `LICENSE`。

@@ -6,7 +6,7 @@ import { searchEmoji, type EmojiEntry } from "./emoji";
 const PLUGIN_VERSION = "0.7.11";
 const INIT_TIMEOUT_MS = 45000;
 const MAX_TRACE = 60;
-const REPORT_FOLDER = "砚台诊断";
+const REPORT_FOLDER = "就打个字诊断";
 // 同一条提醒的最短间隔，以及「系统输入法刚才在工作」这条证据的有效期。
 const IME_WARN_COOLDOWN_MS = 30 * 1000;
 const CJK = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/;
@@ -98,7 +98,7 @@ self.addEventListener("unhandledrejection", function (e) { console.error("[Inkst
     return s.slice(s.lastIndexOf("/") + 1);
   }
   function missing(url) {
-    return new Error("Inkstone IME：资源未内嵌，且运行时不联网 —— " + url);
+    return new Error("Just Type IME：资源未内嵌，且运行时不联网 —— " + url);
   }
 
   self.importScripts = function () {
@@ -251,7 +251,7 @@ interface InkstoneSettings {
 
 const DEFAULT_SETTINGS: InkstoneSettings = { toggleKey: "Shift" };
 
-const MODE_LABEL: Record<InputMode, string> = { chinese: "砚台 中", english: "砚台 英", emoji: "砚台 😀" };
+const MODE_LABEL: Record<InputMode, string> = { chinese: "就打个字 中", english: "就打个字 英", emoji: "就打个字 😀" };
 const MODE_NOTICE: Record<InputMode, string> = {
   chinese: "中文",
   english: "英文",
@@ -299,7 +299,7 @@ class DiagnosticsModal extends Modal {
   onOpen(): void {
     const { contentEl } = this;
     contentEl.addClass("inkstone-diag");
-    contentEl.createEl("h3", { text: "砚台输入法 · 诊断报告" });
+    contentEl.createEl("h3", { text: "就打个字 · 诊断报告" });
     contentEl.createEl("p", {
       cls: "inkstone-diag-hint",
       text: this.sensitive
@@ -411,7 +411,7 @@ export default class InkstonePlugin extends Plugin {
       this.log(`初始化失败：${message}`);
       console.error("RIME initialization failed", error);
       this.updateStatus("加载失败");
-      new Notice(`砚台加载失败：${message}\n运行命令「诊断报告 (report)」查看详情`, 15000);
+      new Notice(`就打个字加载失败：${message}\n运行命令「诊断报告 (report)」查看详情`, 15000);
     }
   }
 
@@ -482,7 +482,7 @@ export default class InkstonePlugin extends Plugin {
     this.imeTookOver = true;
     if (Date.now() - this.lastImeWarnAt < IME_WARN_COOLDOWN_MS) return;
     this.lastImeWarnAt = Date.now();
-    new Notice("系统键盘切到中文了，砚台已停止工作——按键现在归系统输入法。要继续用砚台，请把系统键盘切回英文 ABC。", 8000);
+    new Notice("系统键盘切到中文了，就打个字已停止工作——按键现在归系统输入法。要继续用就打个字，请把系统键盘切回英文 ABC。", 8000);
   }
 
   private describeEvent(event: Event): string {
@@ -535,8 +535,8 @@ export default class InkstonePlugin extends Plugin {
   private readyHint(): string {
     const key = this.settings.toggleKey;
     return key === "none"
-      ? "砚台输入法已就绪——用命令「切换中英文 (toggle)」或点状态栏切换"
-      : `砚台输入法已就绪——按 ${TOGGLE_KEY_LABEL[key]} 在中英文之间切换`;
+      ? "就打个字已就绪——用命令「切换中英文 (toggle)」或点状态栏切换"
+      : `就打个字已就绪——按 ${TOGGLE_KEY_LABEL[key]} 在中英文之间切换`;
   }
 
   private targetTag(target: EventTarget | null): string {
@@ -600,7 +600,7 @@ export default class InkstonePlugin extends Plugin {
       : "  (无)";
 
     return [
-      "砚台输入法 · 诊断报告",
+      "就打个字 · 诊断报告",
       `生成时间：${new Date().toLocaleString()}`,
       `插件版本：${PLUGIN_VERSION}`,
       this.environmentLine(),
@@ -618,7 +618,7 @@ export default class InkstonePlugin extends Plugin {
       "",
       "--- 按键捕获 ---",
       `  收到 keydown：${this.keydownSeen}`,
-      `  被砚台截获：${this.keydownCaptured}`,
+      `  被就打个字截获：${this.keydownCaptured}`,
       `  最近一次按键：${this.lastKeyNote}`,
       "  未截获原因统计：",
       skips,
@@ -693,7 +693,7 @@ export default class InkstonePlugin extends Plugin {
 
   private createControls(): void {
     // Obsidian mobile has no status bar, so the ribbon carries the state there.
-    this.ribbon = this.addRibbonIcon("languages", "砚台：切换中英文", () => this.toggle());
+    this.ribbon = this.addRibbonIcon("languages", "就打个字：切换中英文", () => this.toggle());
     if (!Platform.isMobile) {
       this.status = this.addStatusBarItem();
       this.status.addClass("inkstone-status");
@@ -721,7 +721,7 @@ export default class InkstonePlugin extends Plugin {
       const view = this.activeEditor();
       if (view) this.renderEmojiPanel(view);
     }
-    new Notice(`砚台：${MODE_NOTICE[next]}`);
+    new Notice(`就打个字：${MODE_NOTICE[next]}`);
   }
 
   private updateStatus(override?: string): void {
@@ -733,7 +733,7 @@ export default class InkstonePlugin extends Plugin {
     }
     if (this.ribbon) {
       this.ribbon.toggleClass("is-enabled", active);
-      this.ribbon.setAttribute("aria-label", `砚台：${MODE_NOTICE[this.mode]}`);
+      this.ribbon.setAttribute("aria-label", `就打个字：${MODE_NOTICE[this.mode]}`);
       setIcon(this.ribbon, this.mode === "emoji" ? "smile" : this.mode === "chinese" && this.ready ? "languages" : "type");
     }
   }
@@ -892,7 +892,7 @@ export default class InkstonePlugin extends Plugin {
         console.error("RIME input failed", error);
         this.log(`process("${rimeKey}") 失败：${this.errorMessage(error)}`);
         this.cancelComposition();
-        new Notice(`砚台输入失败：${this.errorMessage(error)}\n可运行命令「诊断报告 (report)」查看详情`, 8000);
+        new Notice(`就打个字输入失败：${this.errorMessage(error)}\n可运行命令「诊断报告 (report)」查看详情`, 8000);
       });
   }
 

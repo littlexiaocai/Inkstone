@@ -1,4 +1,4 @@
-# 砚台输入法 / Inkstone IME —— 交接文档
+# Just Type · 就打个字 / Just Type IME —— 交接文档
 
 写给接手这个项目的人（或 AI）。截至 2026-09-21，`main` 在 `fcc14c2`，Release **0.7.11** 已发布。版本按 0.01 递增（用户明确要求，不跳大版本）。
 
@@ -30,8 +30,9 @@ Obsidian 插件。在编辑器内部接管按键，用本地 RIME 引擎完成�
 | 工作分支 | `main`（`fcc14c2`，已推送）。历史分支名 `offline-0.8.0` 已合入 |
 | 版本 | **0.7.11** |
 | GitHub `main` | `fcc14c2`（已推送） |
-| 最新 Release | **0.7.11**（离线版；目录名 Inkstone IME） |
+| 最新 Release | **0.7.11**（离线版；目录名 Just Type IME） |
 | `dist/main.js` | 6.6 MB（完全内嵌引擎与词库） |
+| 对外名称 | Just Type · 就打个字（目录名 `Just Type IME`）。插件 id 仍是 `inkstone` |
 | 仓库 | https://github.com/littlexiaocai/Inkstone （公开，AGPL-3.0-or-later） |
 
 **版本号规则**：每次按 **0.01** 递增，`0.7.9 → 0.7.10 → 0.7.11`，不要跳 0.8 之类的大版本
@@ -185,7 +186,7 @@ Blob URL，然后调**原生**的 `importScripts` / `fetch`。
 
 已经满足的硬性要求（都核过）：
 
-- `manifest.name` 必须是 Basic Latin → 已改为 `Inkstone IME`（中文名继续用于 README、
+- `manifest.name` 必须是 Basic Latin → 已改为 `Just Type IME`（中文名「就打个字」用于 README、
   设置页、命令、提示文案）
 - `description` ≤250 字符且以 ASCII 句号结尾 → 已改
 - `id` 不含 `obsidian`、不以 `plugin` 结尾 → `inkstone`
@@ -304,7 +305,7 @@ THIRD_PARTY_NOTICES.md       第三方组件与许可证清单
 UPSTREAM.md                  上游归属与内嵌说明
 ```
 
-**许可证**：砚台以 AGPL-3.0-or-later 发布。内嵌的三块各不相同——
+**许可证**：就打个字以 AGPL-3.0-or-later 发布。内嵌的三块各不相同——
 My RIME（AGPL-3.0-or-later）、rime-pinyin-simp（Apache-2.0）、
 rime-stroke（**LGPL-3.0-only**）。完全内嵌意味着每个 Release 都在再分发它们，
 动内嵌内容时必须同步更新 `THIRD_PARTY_NOTICES.md`。

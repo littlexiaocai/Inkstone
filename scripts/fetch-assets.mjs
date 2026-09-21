@@ -1,7 +1,7 @@
 /**
  * 把 RIME 引擎与词库抓到本地，供构建期内嵌。
  *
- * 砚台运行时不联网：引擎（rime.js / rime.wasm / rime.data）和方案文件全部
+ * 就打个字运行时不联网：引擎（rime.js / rime.wasm / rime.data）和方案文件全部
  * 随 main.js 一起分发。这个脚本是「上游包 → 内嵌资源」这一步的可复现过程。
  *
  *   node scripts/fetch-assets.mjs

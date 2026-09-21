@@ -1,7 +1,7 @@
 /**
  * 内嵌的 RIME 引擎与词库。
  *
- * 砚台运行时不联网。引擎、引擎数据和方案文件在构建期由 scripts/fetch-assets.mjs
+ * 就打个字运行时不联网。引擎、引擎数据和方案文件在构建期由 scripts/fetch-assets.mjs
  * 抓到 src/assets/，再由 esbuild 一并打进 main.js：二进制走 binary loader，
  * rime.js 走 text loader 保持原文可读。
  *

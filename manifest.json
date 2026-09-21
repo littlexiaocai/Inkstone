@@ -1,6 +1,6 @@
 {
   "id": "inkstone",
-  "name": "Inkstone IME",
+  "name": "Just Type IME",
   "version": "0.7.11",
   "minAppVersion": "1.5.0",
   "description": "Type Chinese directly in the editor with the RIME engine, bypassing the system input method.",
