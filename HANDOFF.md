@@ -182,7 +182,9 @@ Blob URL，然后调**原生**的 `importScripts` / `fetch`。
 ### P1 —— 提交社区目录
 
 提交入口是 **community.obsidian.md**（登录后关联 GitHub 账号），**不再是**给
-`obsidian-releases` 提 PR。
+`obsidian-releases` 提 PR。仓库侧已就绪（id/name 在 7877 个已上架插件里不撞名，
+Release `0.7.11` 资产齐全）。剩下的是作者用 Obsidian 账号登录并提交仓库
+https://github.com/littlexiaocai/just-type 。
 
 已经满足的硬性要求（都核过）：
 
