@@ -32,8 +32,8 @@ Obsidian 插件。在编辑器内部接管按键，用本地 RIME 引擎完成�
 | GitHub `main` | `fcc14c2`（已推送） |
 | 最新 Release | **0.7.11**（离线版；目录名 Just Type IME） |
 | `dist/main.js` | 6.6 MB（完全内嵌引擎与词库） |
-| 对外名称 | Just Type · 就打个字（目录名 `Just Type IME`）。插件 id 仍是 `inkstone` |
-| 仓库 | https://github.com/littlexiaocai/Inkstone （公开，AGPL-3.0-or-later） |
+| 对外名称 | Just Type · 就打个字（目录名 `Just Type IME`）。插件 id 是 `just-type` |
+| 仓库 | https://github.com/littlexiaocai/just-type （公开，AGPL-3.0-or-later） |
 
 **版本号规则**：每次按 **0.01** 递增，`0.7.9 → 0.7.10 → 0.7.11`，不要跳 0.8 之类的大版本
 （这是用户明确要求的）。四处要同步：`manifest.json`、`package.json`、
@@ -176,7 +176,7 @@ Blob URL，然后调**原生**的 `importScripts` / `fetch`。
    `importScripts` / `fetch` 不再打印）。
 
 3. **合上 `main` 并发布 0.7.11** — **已做**（`fcc14c2`，tag `0.7.11`，无 `v` 前缀）。
-   Release：https://github.com/littlexiaocai/Inkstone/releases/tag/0.7.11
+   Release：https://github.com/littlexiaocai/just-type/releases/tag/0.7.11
    资产含独立文件 `main.js` / `manifest.json` / `styles.css`，以及 zip。
 
 ### P1 —— 提交社区目录
@@ -189,7 +189,7 @@ Blob URL，然后调**原生**的 `importScripts` / `fetch`。
 - `manifest.name` 必须是 Basic Latin → 已改为 `Just Type IME`（中文名「就打个字」用于 README、
   设置页、命令、提示文案）
 - `description` ≤250 字符且以 ASCII 句号结尾 → 已改
-- `id` 不含 `obsidian`、不以 `plugin` 结尾 → `inkstone`
+- `id` 不含 `obsidian`、不以 `plugin` 结尾 → `just-type`
 - 命令 id 不含插件 id → 符合
 - 不用 `innerHTML` / `outerHTML` / 全局 `app` → 符合
 - 不给命令设默认快捷键 → 0.7.11 已移除
@@ -283,7 +283,7 @@ npm run build -- --dev          # 需要 sourcemap 时（发布版默认不带�
 > base64 塞进产物，体积直接翻倍——对 iPad 是纯负担。
 
 安装到 Vault 测试：把 `dist/main.js`、`manifest.json`、`styles.css` 拷进
-`<vault>/.obsidian/plugins/inkstone/`，然后在 Obsidian 里重新加载。
+`<vault>/.obsidian/plugins/just-type/`，然后在 Obsidian 里重新加载。
 
 **桌面测试前务必确认系统输入法是英文 ABC**，否则按键会被系统输入法吃掉，
 你会得到一堆莫名其妙的现象（本项目在这上面浪费了好几轮）。

@@ -43,7 +43,7 @@ Just Type 是一个面向 iPad 外接键盘的 Obsidian 中文输入插件，用
 
 ## 安装
 
-把 Release 里的 `main.js`、`manifest.json`、`styles.css` 放进 Vault 的 `.obsidian/plugins/inkstone/`，重启 Obsidian 后在「设置 → 第三方插件」启用 **Just Type IME**。插件内部称「就打个字」。
+把 Release 里的 `main.js`、`manifest.json`、`styles.css` 放进 Vault 的 `.obsidian/plugins/just-type/`，重启 Obsidian 后在「设置 → 第三方插件」启用 **Just Type IME**。插件内部称「就打个字」。
 
 **运行时不联网。** RIME 引擎、引擎数据和拼音方案全部随 `main.js` 一起分发，首次启动也不需要网络。`main.js` 因此约 6.6 MB。
 

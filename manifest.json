@@ -1,10 +1,10 @@
 {
-  "id": "inkstone",
+  "id": "just-type",
   "name": "Just Type IME",
   "version": "0.7.11",
   "minAppVersion": "1.5.0",
   "description": "Type Chinese directly in the editor with the RIME engine, bypassing the system input method.",
   "author": "littlexiaocai",
-  "authorUrl": "https://github.com/littlexiaocai/Inkstone",
+  "authorUrl": "https://github.com/littlexiaocai/just-type",
   "isDesktopOnly": false
 }
