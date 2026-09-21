@@ -35,7 +35,7 @@ var __toBinary = /* @__PURE__ */ (() => {
 // src/main.ts
 var main_exports = {};
 __export(main_exports, {
-  default: () => InkstonePlugin
+  default: () => JustTypePlugin
 });
 module.exports = __toCommonJS(main_exports);
 var import_obsidian = require("obsidian");
@@ -436,8 +436,8 @@ function buildLocalResolver(urls) {
   return `
 self.process = undefined;
 self.require = undefined;
-self.addEventListener("error", function (e) { console.error("[Inkstone] worker error:", e.message, e.filename, e.lineno); });
-self.addEventListener("unhandledrejection", function (e) { console.error("[Inkstone] worker rejection:", e.reason && (e.reason.stack || e.reason.message || e.reason)); });
+self.addEventListener("error", function (e) { console.error("[Just Type] worker error:", e.message, e.filename, e.lineno); });
+self.addEventListener("unhandledrejection", function (e) { console.error("[Just Type] worker rejection:", e.reason && (e.reason.stack || e.reason.message || e.reason)); });
 (function () {
   // \u4E0A\u6E38\u7684 Module.printErr \u628A /[EWID]\\S+ \\S+ \\S+ (.*)/ \u4E0D\u5E26\u951A\u70B9\u5730 match\uFF0C
   // \u4E8E\u662F\u4EFB\u4F55\u4F4D\u7F6E\u547D\u4E2D\u90FD\u4F1A\u53BB\u53D6 {E,W,I,D}[msg[0]]\uFF1B\u6D88\u606F\u4E0D\u4EE5\u8FD9\u56DB\u4E2A\u5B57\u6BCD\u5F00\u5934\u65F6
@@ -452,7 +452,7 @@ self.addEventListener("unhandledrejection", function (e) { console.error("[Inkst
         var original = m.printErr;
         m.printErr = function (msg) {
           try { original.call(this, msg); }
-          catch (e) { console.error("[Inkstone] RIME:", msg); }
+          catch (e) { console.error("[Just Type] RIME:", msg); }
         };
       }
       moduleValue = m;
@@ -596,7 +596,7 @@ var MODE_NOTICE = {
   english: "\u82F1\u6587",
   emoji: "\u8868\u60C5 \u2014 \u6253\u5173\u952E\u8BCD\u641C\u7D22\uFF0C\u5982 xiao / smile / huo\u3002\u6309 Shift \u56DE\u4E2D\u6587"
 };
-var InkstoneSettingTab = class extends import_obsidian.PluginSettingTab {
+var JustTypeSettingTab = class extends import_obsidian.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -624,17 +624,17 @@ var DiagnosticsModal = class extends import_obsidian.Modal {
   }
   onOpen() {
     const { contentEl } = this;
-    contentEl.addClass("inkstone-diag");
+    contentEl.addClass("just-type-diag");
     contentEl.createEl("h3", { text: "\u5C31\u6253\u4E2A\u5B57 \xB7 \u8BCA\u65AD\u62A5\u544A" });
     contentEl.createEl("p", {
-      cls: "inkstone-diag-hint",
+      cls: "just-type-diag-hint",
       text: this.sensitive ? "\u26A0\uFE0F \u672C\u6B21\u8BB0\u5F55\u5305\u542B\u4F60\u5B9E\u9645\u6572\u4E0B\u7684\u6309\u952E\u5185\u5BB9\u3002\u5916\u53D1\u524D\u8BF7\u5148\u901A\u8BFB\u4E00\u904D\u3002" : "\u53EF\u4EE5\u628A\u8FD9\u4EFD\u62A5\u544A\u53D1\u7ED9\u534F\u52A9\u6392\u67E5\u7684\u4EBA\u3002\u6309\u952E\u5185\u5BB9\u5DF2\u8131\u654F\uFF0C\u53EA\u4FDD\u7559\u7C7B\u522B\uFF08\u5B57\u6BCD/\u6570\u5B57/\u7B26\u53F7\uFF09\u3002"
     });
-    const area = contentEl.createEl("textarea", { cls: "inkstone-diag-text" });
+    const area = contentEl.createEl("textarea", { cls: "just-type-diag-text" });
     area.value = this.report;
     area.readOnly = true;
     area.rows = 18;
-    const actions = contentEl.createDiv({ cls: "inkstone-diag-actions" });
+    const actions = contentEl.createDiv({ cls: "just-type-diag-actions" });
     const copyButton = actions.createEl("button", { text: "\u590D\u5236\u62A5\u544A", cls: "mod-cta" });
     copyButton.addEventListener("click", async () => {
       try {
@@ -653,7 +653,7 @@ var DiagnosticsModal = class extends import_obsidian.Modal {
     this.contentEl.empty();
   }
 };
-var InkstonePlugin = class extends import_obsidian.Plugin {
+var JustTypePlugin = class extends import_obsidian.Plugin {
   constructor() {
     super(...arguments);
     this.mode = "chinese";
@@ -685,7 +685,7 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
   }
   async onload() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-    this.addSettingTab(new InkstoneSettingTab(this.app, this));
+    this.addSettingTab(new JustTypeSettingTab(this.app, this));
     this.log(`\u63D2\u4EF6 ${PLUGIN_VERSION} \u8F7D\u5165`);
     this.log(this.environmentLine());
     this.createPanel();
@@ -751,7 +751,7 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
       this.register(() => document.removeEventListener(type, handler, true));
     }
   }
-  /* 英文模式下砚台完全放行按键，打出中文还是英文取决于系统输入源。插件查不到
+  /* 英文模式下就打个字完全放行按键，打出中文还是英文取决于系统输入源。插件查不到
        系统输入源（网页环境没有这个 API），只能从事件反推。
   
        注意：不能拿「有 composition 事件」当判据。macOS 上那确实意味着输入法在转换，
@@ -769,8 +769,8 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
     if (!CJK.test(event.data ?? "")) return;
     this.warnSystemImeTookOver();
   }
-  /* 系统键盘切到中文时，砚台在任何模式下都不工作——按键在到达插件之前就被系统
-       输入法吃掉了。所以话要说「砚台停了」，不是「你在某某模式」：用户需要知道的是
+  /* 系统键盘切到中文时，就打个字在任何模式下都不工作——按键在到达插件之前就被系统
+       输入法吃掉了。所以话要说「就打个字停了」，不是「你在某某模式」：用户需要知道的是
        工具还灵不灵，不是自己处在哪一档。
   
        两条触发路径共用这一条文案：中文模式下按键被 229 连续跳过，以及任何模式下
@@ -956,7 +956,7 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
     this.ribbon = this.addRibbonIcon("languages", "\u5C31\u6253\u4E2A\u5B57\uFF1A\u5207\u6362\u4E2D\u82F1\u6587", () => this.toggle());
     if (!import_obsidian.Platform.isMobile) {
       this.status = this.addStatusBarItem();
-      this.status.addClass("inkstone-status");
+      this.status.addClass("just-type-status");
       this.status.addEventListener("click", () => this.toggle());
     }
   }
@@ -994,10 +994,10 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
     }
   }
   createPanel() {
-    this.panel = document.body.createDiv({ cls: "inkstone-panel" });
+    this.panel = document.body.createDiv({ cls: "just-type-panel" });
     this.panel.setAttribute("aria-live", "polite");
-    this.preedit = this.panel.createDiv({ cls: "inkstone-preedit" });
-    this.candidates = this.panel.createDiv({ cls: "inkstone-candidates" });
+    this.preedit = this.panel.createDiv({ cls: "just-type-preedit" });
+    this.candidates = this.panel.createDiv({ cls: "just-type-candidates" });
   }
   /* ---------------- input ---------------- */
   isEditorTarget(target) {
@@ -1051,7 +1051,7 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
        keyCode=0。实测它有时不会跟上 beforeinput/input，表情就插不进文档（诊断报告
        2026-09-20-214712 里 🥳 失败、🤩 成功，同样的动作两种结果）。
   
-       既然按键送到了，就由砚台自己写进文档，不再看系统脸色。preventDefault 掐掉系统
+       既然按键送到了，就由就打个字自己写进文档，不再看系统脸色。preventDefault 掐掉系统
        那条不稳的插入路径，所以不会重复上屏。
        结构判据：keyCode=0、code 未识别、无修饰键。内容判据用 Unicode 表情属性，
        排除 CJK 和任何字母（含 é ü），避免把非表情的非 ASCII 键当表情插入。 */
@@ -1078,7 +1078,7 @@ var InkstonePlugin = class extends import_obsidian.Plugin {
     this.markTrace(this.pendingTrace, "\u8868\u60C5\u76F4\u63A5\u4E0A\u5C4F");
     this.pendingTrace = -1;
   }
-  /* 「砚台停了」有提示，「砚台回来了」也得有，否则用户不知道什么时候能接着用。
+  /* 「就打个字停了」有提示，「就打个字回来了」也得有，否则用户不知道什么时候能接着用。
      插件查不到系统输入源，但能从按键反推：系统中文输入法在工作时，按键到达这里
      是 keyCode 229 / isComposing；一旦有正常字符键落进编辑器，就说明系统交还了
      控制权。只在确实被接管过之后报一次，平时不啰嗦。 */

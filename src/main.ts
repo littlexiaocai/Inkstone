@@ -64,8 +64,8 @@ function buildLocalResolver(urls: Record<string, string>): string {
   return `
 self.process = undefined;
 self.require = undefined;
-self.addEventListener("error", function (e) { console.error("[Inkstone] worker error:", e.message, e.filename, e.lineno); });
-self.addEventListener("unhandledrejection", function (e) { console.error("[Inkstone] worker rejection:", e.reason && (e.reason.stack || e.reason.message || e.reason)); });
+self.addEventListener("error", function (e) { console.error("[Just Type] worker error:", e.message, e.filename, e.lineno); });
+self.addEventListener("unhandledrejection", function (e) { console.error("[Just Type] worker rejection:", e.reason && (e.reason.stack || e.reason.message || e.reason)); });
 (function () {
   // 上游的 Module.printErr 把 /[EWID]\\S+ \\S+ \\S+ (.*)/ 不带锚点地 match，
   // 于是任何位置命中都会去取 {E,W,I,D}[msg[0]]；消息不以这四个字母开头时
@@ -80,7 +80,7 @@ self.addEventListener("unhandledrejection", function (e) { console.error("[Inkst
         var original = m.printErr;
         m.printErr = function (msg) {
           try { original.call(this, msg); }
-          catch (e) { console.error("[Inkstone] RIME:", msg); }
+          catch (e) { console.error("[Just Type] RIME:", msg); }
         };
       }
       moduleValue = m;
@@ -245,11 +245,11 @@ const TOGGLE_KEY_LABEL: Record<ToggleKey, string> = {
   none: "关闭（只用命令或状态栏切换）"
 };
 
-interface InkstoneSettings {
+interface JustTypeSettings {
   toggleKey: ToggleKey;
 }
 
-const DEFAULT_SETTINGS: InkstoneSettings = { toggleKey: "Shift" };
+const DEFAULT_SETTINGS: JustTypeSettings = { toggleKey: "Shift" };
 
 const MODE_LABEL: Record<InputMode, string> = { chinese: "就打个字 中", english: "就打个字 英", emoji: "就打个字 😀" };
 const MODE_NOTICE: Record<InputMode, string> = {
@@ -266,8 +266,8 @@ type SkipReason =
   | "系统输入法组合中"
   | "非拼音按键";
 
-class InkstoneSettingTab extends PluginSettingTab {
-  constructor(app: App, private plugin: InkstonePlugin) {
+class JustTypeSettingTab extends PluginSettingTab {
+  constructor(app: App, private plugin: JustTypePlugin) {
     super(app, plugin);
   }
 
@@ -298,20 +298,20 @@ class DiagnosticsModal extends Modal {
 
   onOpen(): void {
     const { contentEl } = this;
-    contentEl.addClass("inkstone-diag");
+    contentEl.addClass("just-type-diag");
     contentEl.createEl("h3", { text: "就打个字 · 诊断报告" });
     contentEl.createEl("p", {
-      cls: "inkstone-diag-hint",
+      cls: "just-type-diag-hint",
       text: this.sensitive
         ? "⚠️ 本次记录包含你实际敲下的按键内容。外发前请先通读一遍。"
         : "可以把这份报告发给协助排查的人。按键内容已脱敏，只保留类别（字母/数字/符号）。"
     });
-    const area = contentEl.createEl("textarea", { cls: "inkstone-diag-text" });
+    const area = contentEl.createEl("textarea", { cls: "just-type-diag-text" });
     area.value = this.report;
     area.readOnly = true;
     area.rows = 18;
 
-    const actions = contentEl.createDiv({ cls: "inkstone-diag-actions" });
+    const actions = contentEl.createDiv({ cls: "just-type-diag-actions" });
     const copyButton = actions.createEl("button", { text: "复制报告", cls: "mod-cta" });
     copyButton.addEventListener("click", async () => {
       try {
@@ -332,7 +332,7 @@ class DiagnosticsModal extends Modal {
   }
 }
 
-export default class InkstonePlugin extends Plugin {
+export default class JustTypePlugin extends Plugin {
   private client?: RimeWorkerClient;
   private mode: InputMode = "chinese";
   private emojiQuery = "";
@@ -361,7 +361,7 @@ export default class InkstonePlugin extends Plugin {
   private eventCounts: Record<string, number> = {};
   private pendingTrace = -1;
   private toggleArmed = false;
-  settings: InkstoneSettings = { ...DEFAULT_SETTINGS };
+  settings: JustTypeSettings = { ...DEFAULT_SETTINGS };
   private imeConflictStreak = 0;
   private lastImeWarnAt = 0;
   private imeTookOver = false;
@@ -370,7 +370,7 @@ export default class InkstonePlugin extends Plugin {
 
   async onload(): Promise<void> {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-    this.addSettingTab(new InkstoneSettingTab(this.app, this));
+    this.addSettingTab(new JustTypeSettingTab(this.app, this));
     this.log(`插件 ${PLUGIN_VERSION} 载入`);
     this.log(this.environmentLine());
 
@@ -453,7 +453,7 @@ export default class InkstonePlugin extends Plugin {
     }
   }
 
-  /* 英文模式下砚台完全放行按键，打出中文还是英文取决于系统输入源。插件查不到
+  /* 英文模式下就打个字完全放行按键，打出中文还是英文取决于系统输入源。插件查不到
      系统输入源（网页环境没有这个 API），只能从事件反推。
 
      注意：不能拿「有 composition 事件」当判据。macOS 上那确实意味着输入法在转换，
@@ -472,8 +472,8 @@ export default class InkstonePlugin extends Plugin {
     this.warnSystemImeTookOver();
   }
 
-  /* 系统键盘切到中文时，砚台在任何模式下都不工作——按键在到达插件之前就被系统
-     输入法吃掉了。所以话要说「砚台停了」，不是「你在某某模式」：用户需要知道的是
+  /* 系统键盘切到中文时，就打个字在任何模式下都不工作——按键在到达插件之前就被系统
+     输入法吃掉了。所以话要说「就打个字停了」，不是「你在某某模式」：用户需要知道的是
      工具还灵不灵，不是自己处在哪一档。
 
      两条触发路径共用这一条文案：中文模式下按键被 229 连续跳过，以及任何模式下
@@ -696,7 +696,7 @@ export default class InkstonePlugin extends Plugin {
     this.ribbon = this.addRibbonIcon("languages", "就打个字：切换中英文", () => this.toggle());
     if (!Platform.isMobile) {
       this.status = this.addStatusBarItem();
-      this.status.addClass("inkstone-status");
+      this.status.addClass("just-type-status");
       this.status.addEventListener("click", () => this.toggle());
     }
   }
@@ -739,10 +739,10 @@ export default class InkstonePlugin extends Plugin {
   }
 
   private createPanel(): void {
-    this.panel = document.body.createDiv({ cls: "inkstone-panel" });
+    this.panel = document.body.createDiv({ cls: "just-type-panel" });
     this.panel.setAttribute("aria-live", "polite");
-    this.preedit = this.panel.createDiv({ cls: "inkstone-preedit" });
-    this.candidates = this.panel.createDiv({ cls: "inkstone-candidates" });
+    this.preedit = this.panel.createDiv({ cls: "just-type-preedit" });
+    this.candidates = this.panel.createDiv({ cls: "just-type-candidates" });
   }
 
   /* ---------------- input ---------------- */
@@ -807,7 +807,7 @@ export default class InkstonePlugin extends Plugin {
      keyCode=0。实测它有时不会跟上 beforeinput/input，表情就插不进文档（诊断报告
      2026-09-20-214712 里 🥳 失败、🤩 成功，同样的动作两种结果）。
 
-     既然按键送到了，就由砚台自己写进文档，不再看系统脸色。preventDefault 掐掉系统
+     既然按键送到了，就由就打个字自己写进文档，不再看系统脸色。preventDefault 掐掉系统
      那条不稳的插入路径，所以不会重复上屏。
      结构判据：keyCode=0、code 未识别、无修饰键。内容判据用 Unicode 表情属性，
      排除 CJK 和任何字母（含 é ü），避免把非表情的非 ASCII 键当表情插入。 */
@@ -838,7 +838,7 @@ export default class InkstonePlugin extends Plugin {
     this.pendingTrace = -1;
   }
 
-  /* 「砚台停了」有提示，「砚台回来了」也得有，否则用户不知道什么时候能接着用。
+  /* 「就打个字停了」有提示，「就打个字回来了」也得有，否则用户不知道什么时候能接着用。
      插件查不到系统输入源，但能从按键反推：系统中文输入法在工作时，按键到达这里
      是 keyCode 229 / isComposing；一旦有正常字符键落进编辑器，就说明系统交还了
      控制权。只在确实被接管过之后报一次，平时不啰嗦。 */

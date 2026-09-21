@@ -1,4 +1,4 @@
-.inkstone-panel {
+.just-type-panel {
   position: fixed;
   z-index: 10000;
   left: 50%;
@@ -16,7 +16,7 @@
   transition: opacity 80ms ease, transform 80ms ease;
 }
 
-.inkstone-panel.is-visible {
+.just-type-panel.is-visible {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
@@ -24,7 +24,7 @@
 }
 
 /* 跟随光标时由 JS 写入 left/top；宽度收成内容宽，别再横贯整屏。 */
-.inkstone-panel.is-anchored {
+.just-type-panel.is-anchored {
   left: 0;
   top: 0;
   bottom: auto;
@@ -33,11 +33,11 @@
   transform: none;
 }
 
-.inkstone-panel.is-anchored.is-visible {
+.just-type-panel.is-anchored.is-visible {
   transform: none;
 }
 
-.inkstone-preedit {
+.just-type-preedit {
   min-height: 22px;
   margin-bottom: 8px;
   color: var(--text-accent);
@@ -45,18 +45,18 @@
   font-weight: 600;
 }
 
-.inkstone-candidates {
+.just-type-candidates {
   display: flex;
   gap: 6px;
   overflow-x: auto;
   scrollbar-width: none;
 }
 
-.inkstone-candidates::-webkit-scrollbar {
+.just-type-candidates::-webkit-scrollbar {
   display: none;
 }
 
-.inkstone-candidates button {
+.just-type-candidates button {
   flex: 0 0 auto;
   min-height: 34px;
   padding: 5px 10px;
@@ -67,16 +67,16 @@
   font-size: 15px;
 }
 
-.inkstone-candidates button.is-highlighted {
+.just-type-candidates button.is-highlighted {
   background: var(--interactive-accent);
   color: var(--text-on-accent);
 }
 
-.inkstone-status {
+.just-type-status {
   cursor: pointer;
 }
 
-.inkstone-status.is-enabled {
+.just-type-status.is-enabled {
   color: var(--text-accent);
   font-weight: 600;
 }
@@ -88,14 +88,14 @@
 }
 
 /* --- diagnostics modal --- */
-.inkstone-diag-hint {
+.just-type-diag-hint {
   margin: 0 0 10px;
   color: var(--text-muted);
   font-size: 13px;
   line-height: 1.5;
 }
 
-.inkstone-diag-text {
+.just-type-diag-text {
   width: 100%;
   min-height: 300px;
   resize: vertical;
@@ -106,7 +106,7 @@
   overflow: auto;
 }
 
-.inkstone-diag-actions {
+.just-type-diag-actions {
   display: flex;
   gap: 8px;
   justify-content: flex-end;
