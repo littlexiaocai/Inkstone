@@ -99,4 +99,12 @@ iPadOS 有时不会把表情面板的点击变成文本（同样的动作时好�
 - My RIME: https://github.com/LibreService/my_rime
 - RIME: https://rime.im/
 
-内嵌 My RIME 0.10.9 的 WebAssembly Worker，源项目采用 AGPL-3.0-or-later 许可，砚台以同一许可发布。详见 `UPSTREAM.md`。
+砚台以 **AGPL-3.0-or-later** 发布，与其内嵌的 My RIME 一致。
+
+运行时不联网意味着仓库和每个 Release 都在再分发第三方作品。完整清单、版本与许可证见 `THIRD_PARTY_NOTICES.md`；构建期的抓取过程见 `UPSTREAM.md`。主要的三块：
+
+| 组件 | 许可证 |
+|---|---|
+| My RIME 0.10.9（Worker、引擎、引擎数据） | AGPL-3.0-or-later |
+| rime-pinyin-simp 方案 | Apache-2.0 |
+| rime-stroke 方案（`pinyin_simp` 的笔画反查依赖） | LGPL-3.0-only |
