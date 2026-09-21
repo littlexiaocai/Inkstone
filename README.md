@@ -135,20 +135,16 @@ Verified:
 - 同一编辑器内用鼠标点选移动光标时，组合态尚未重置。失焦、切笔记、切窗格会取消组合并作废在途结果。
 - 暂未处理所有 Markdown 快捷键、候选翻页按钮和用户设置界面。
 
-## Upstream and license
+## 上游项目与许可
 
 - My RIME: https://github.com/LibreService/my_rime
 - RIME: https://rime.im/
 
-Just Type is released under **AGPL-3.0-or-later**, matching bundled My RIME.
-
 就打个字以 **AGPL-3.0-or-later** 发布，与其内嵌的 My RIME 一致。
-
-Shipping offline means this repository and every Release redistribute third-party work. Full list, versions, and licenses: `THIRD_PARTY_NOTICES.md`. Fetch process: `UPSTREAM.md`.
 
 运行时不联网意味着仓库和每个 Release 都在再分发第三方作品。完整清单、版本与许可证见 `THIRD_PARTY_NOTICES.md`；构建期的抓取过程见 `UPSTREAM.md`。主要的两块：
 
-| Component | License | 许可证 |
-|---|---|---|
-| My RIME 0.10.9 (Worker, engine, engine data) | AGPL-3.0-or-later | AGPL-3.0-or-later |
-| rime-pinyin-simp (stroke reverse-lookup removed) | Apache-2.0 | Apache-2.0 |
+| 组件 | 许可证 |
+|---|---|
+| My RIME 0.10.9（Worker、引擎、引擎数据） | AGPL-3.0-or-later |
+| rime-pinyin-simp 方案（已裁掉笔画反查） | Apache-2.0 |
