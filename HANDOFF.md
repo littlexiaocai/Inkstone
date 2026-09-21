@@ -155,7 +155,6 @@ Blob URL，然后调**原生**的 `importScripts` / `fetch`。
 | **干净环境首装** | Worker 会把方案文件缓存在 IndexedDB。iPad 上跑过旧版，缓存存在，可能替内嵌词库兜底。要彻底排除需要一台没装过砚台的设备 |
 | **设置页下拉框的实际渲染** | Obsidian 设置窗口截图被工具拒绝，只做了静态核对 |
 | **中英切换键改成 Control / Option / Command** | 只验了默认的 Shift |
-| **iPad 屏幕键盘** | 插件只挂 `keydown`，iOS 软键盘未必给出可用的 `key` 值。软键盘下的切换目前只能靠 Obsidian 移动端工具栏按钮 |
 | **表情模式在 iPad 上** | 只在 macOS 验过 |
 | **退格改表情查询** | `app_key` 的退格走 AX 通道，在该元素上失败，测不了 |
 
