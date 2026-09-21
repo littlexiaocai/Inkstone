@@ -1,1 +1,6 @@
 node_modules/
+
+# 构建期从上游抓取的引擎与词库，由 scripts/fetch-assets.mjs 生成
+# （体积大且可复现；ASSETS.json 记录了来源与 sha256）
+src/assets/*.gz
+src/assets/*.txt

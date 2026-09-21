@@ -1,0 +1,75 @@
+{
+  "myRime": "0.10.9",
+  "schemas": {
+    "pinyin-simp": "0.1.1",
+    "stroke": "0.1.3"
+  },
+  "files": {
+    "rime.js.txt": {
+      "url": "https://cdn.jsdelivr.net/npm/@libreservice/my-rime@0.10.9/dist/rime.js",
+      "bytes": 116319,
+      "stored": 116319,
+      "sha256": "22273c826ff871853c6126bc6d251b30acb27443269d562557c2c5b0b8b6f8ab"
+    },
+    "rime.wasm.gz": {
+      "url": "https://cdn.jsdelivr.net/npm/@libreservice/my-rime@0.10.9/dist/rime.wasm",
+      "bytes": 2835974,
+      "stored": 883252,
+      "sha256": "0a03a6147fe43bccff9f295e054cd7eb3b6056e3359ea4b232185723123b1f17"
+    },
+    "rime.data.gz": {
+      "url": "https://cdn.jsdelivr.net/npm/@libreservice/my-rime@0.10.9/dist/rime.data",
+      "bytes": 1161905,
+      "stored": 557700,
+      "sha256": "cfef452cac5f09ca6753b34d11d20ee0d844f3c4cd09ab28ee151a49278479d2"
+    },
+    "pinyin_simp.schema.yaml.gz": {
+      "url": "https://cdn.jsdelivr.net/npm/@rime-contrib/pinyin-simp@0.1.1/pinyin_simp.schema.yaml",
+      "bytes": 40546,
+      "stored": 15158,
+      "sha256": "3f1cbbb4dcae60749a71ab186317637f785afc0edae1b7783df9d355b892e861"
+    },
+    "pinyin_simp.prism.bin.gz": {
+      "url": "https://cdn.jsdelivr.net/npm/@rime-contrib/pinyin-simp@0.1.1/pinyin_simp.prism.bin",
+      "bytes": 30016,
+      "stored": 7731,
+      "sha256": "088c7b1345cd2725a8d707dabc36ccbe9fae4032285f5dba8ab5afbe1a61bc4f"
+    },
+    "pinyin_simp.table.bin.gz": {
+      "url": "https://cdn.jsdelivr.net/npm/@rime-contrib/pinyin-simp@0.1.1/pinyin_simp.table.bin",
+      "bytes": 1475904,
+      "stored": 702066,
+      "sha256": "148061c195d4edea881e36ae749218af8ce40f36b1d115e38007a32ba81c6031"
+    },
+    "pinyin_simp.reverse.bin.gz": {
+      "url": "https://cdn.jsdelivr.net/npm/@rime-contrib/pinyin-simp@0.1.1/pinyin_simp.reverse.bin",
+      "bytes": 103248,
+      "stored": 33008,
+      "sha256": "f2a352d888399786be5af9e76aeb987c3993b95ddb6d1290abe43de8d24e1450"
+    },
+    "stroke.schema.yaml.gz": {
+      "url": "https://cdn.jsdelivr.net/npm/@rime-contrib/stroke@0.1.3/stroke.schema.yaml",
+      "bytes": 6183,
+      "stored": 1731,
+      "sha256": "1cce8d24e23633253719057012d7e8ce49f55552c17f20b3b6f092852106de34"
+    },
+    "stroke.prism.bin.gz": {
+      "url": "https://cdn.jsdelivr.net/npm/@rime-contrib/stroke@0.1.3/stroke.prism.bin",
+      "bytes": 2389308,
+      "stored": 1180497,
+      "sha256": "2dc38078705aefbcc42fb1900150647922442bf0e4fdd0b680f4a73a5bf22d8b"
+    },
+    "stroke.table.bin.gz": {
+      "url": "https://cdn.jsdelivr.net/npm/@rime-contrib/stroke@0.1.3/stroke.table.bin",
+      "bytes": 3011004,
+      "stored": 1073462,
+      "sha256": "3ce831fbf87f7d626e209a82f0ee8474766ddd9820bf57103a9beab501fb71a7"
+    },
+    "stroke.reverse.bin.gz": {
+      "url": "https://cdn.jsdelivr.net/npm/@rime-contrib/stroke@0.1.3/stroke.reverse.bin",
+      "bytes": 906160,
+      "stored": 581981,
+      "sha256": "e5233159a01ab38f894b18ca274423e5e2f377b37ff9287be45324da190a0cc8"
+    }
+  }
+}
