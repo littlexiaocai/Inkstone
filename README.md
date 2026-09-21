@@ -1,14 +1,14 @@
 # Just Type · 就打个字
 
-**本来不该需要一个插件。**
-
-面向 iPad 外接键盘的 Obsidian 中文输入插件。
-
 ### 为什么会有这个项目
 
-我本来只是想在 iPad 上用外接键盘流畅的写点中文，没想到还得先做个输入法。
+Just Type 是一个面向 iPad 外接键盘的 Obsidian 中文输入插件，用来绕开长期存在的中文输入卡顿问题。
 
-Just Type 是我给自己想的办法。希望它早日用不上。
+我本来只是想在 iPad 上用外接键盘，好好写点中文。没想到，写笔记之前，还得先写个输入法。
+
+不过，它只能改善 Obsidian 内的输入体验，无法修复系统输入法。至于 iPad 上的其他应用，还是得继续等——等，等苹果解决。
+
+这是我给自己想的办法。**希望它早日用不上。**
 
 拼音引擎用 [RIME](https://rime.im/)，通过 [My RIME](https://github.com/LibreService/my_rime) 的 WebAssembly 构建。
 
