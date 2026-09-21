@@ -107,15 +107,17 @@ Default traces are **redacted**: `key=<letter>` / `code=<letter key>` / `kc=<con
 
 ## Feedback
 
-Open an issue: https://github.com/littlexiaocai/just-type/issues
+If you run into a problem, please open a GitHub Issue: https://github.com/littlexiaocai/just-type/issues
 
-Please include Obsidian version, iPad model and iPadOS version, which keyboard you use, and whether the system keyboard was English ABC. If you can, attach the plugin's **诊断报告 (report)** — command palette → “诊断报告 (report)” or “诊断：把报告存进 Vault (save report)”.
+If GitHub is inconvenient, email me: 13675150436cc@163.com
+
+If you can, include your iPad model, iPadOS version, Obsidian version, and a screenshot or screen recording of the issue.
 
 ### 反馈
 
-有问题请开 Issue：https://github.com/littlexiaocai/just-type/issues
-
-请写上 Obsidian 版本、iPad 型号和系统版本、外接键盘，以及当时系统键盘是不是英文 ABC。能的话附上插件里的 **诊断报告 (report)**：命令面板搜「诊断报告 (report)」，或用「诊断：把报告存进 Vault (save report)」存成笔记再贴过来。
+如果你遇到了问题，欢迎通过 GitHub Issues 提交：https://github.com/littlexiaocai/just-type/issues
+不方便使用 GitHub，也可以直接发邮件给我：13675150436cc@163.com
+如果方便，请附上 iPad 型号、iPadOS 版本、Obsidian 版本以及问题截图或录屏。
 
 ## Tested
 
