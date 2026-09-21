@@ -109,14 +109,14 @@ Default traces are **redacted**: `key=<letter>` / `code=<letter key>` / `kc=<con
 
 If you run into a problem, please open a GitHub Issue: https://github.com/littlexiaocai/just-type/issues
 
-If GitHub is inconvenient, email me: 13675150436cc@163.com
+If GitHub is inconvenient, email me: xxyybear@gmail.com
 
 If you can, include your iPad model, iPadOS version, Obsidian version, and a screenshot or screen recording of the issue.
 
 ### 反馈
 
 如果你遇到了问题，欢迎通过 GitHub Issues 提交：https://github.com/littlexiaocai/just-type/issues
-不方便使用 GitHub，也可以直接发邮件给我：13675150436cc@163.com
+不方便使用 GitHub，也可以直接发邮件给我：xxyybear@gmail.com
 如果方便，请附上 iPad 型号、iPadOS 版本、Obsidian 版本以及问题截图或录屏。
 
 ## Tested
