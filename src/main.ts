@@ -1,9 +1,9 @@
-import { App, MarkdownView, Modal, Notice, Platform, Plugin, PluginSettingTab, Setting, requestUrl, setIcon } from "obsidian";
+import { App, MarkdownView, Modal, Notice, Platform, Plugin, PluginSettingTab, Setting, setIcon } from "obsidian";
 import workerSource from "./vendor/my-rime-worker.txt";
+import { assetSummary, loadLocalAssets, type LocalAssets } from "./assets";
 import { searchEmoji, type EmojiEntry } from "./emoji";
 
-const PLUGIN_VERSION = "0.7.11";
-const PROBE_URL = "https://cdn.jsdelivr.net/npm/@libreservice/my-rime@0.10.9/dist/rime.js";
+const PLUGIN_VERSION = "0.8.0";
 const INIT_TIMEOUT_MS = 45000;
 const MAX_TRACE = 60;
 const REPORT_FOLDER = "砚台诊断";
@@ -44,19 +44,110 @@ function timeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> 
   });
 }
 
+/**
+ * 注入 Worker 的本地资源解析器。
+ *
+ * 上游 Worker 通过两个入口取资源：一处 importScripts 拉 rime.js，一处 fetch 拉
+ * wasm / data / 方案文件。主线程在建 Worker 之前已把内嵌资源解压成 Blob URL，
+ * 这段 shim 只做一件事：把上游拼出来的 CDN 地址换成对应的本地 Blob URL，然后
+ * 调用原生实现。
+ *
+ * 不用消息传递、不接管 onmessage、不 eval——映射表在建 Worker 时就写死在源码里，
+ * 没有先后顺序可言，也就没有竞态。
+ *
+ * 关键约束：**映射里没有就立刻抛错，绝不回落网络**。留回落等于远程代码路径还在，
+ * 审核问题并没有真正消失，失败也会变成难查的静默降级。
+ */
+function buildLocalResolver(urls: Record<string, string>): string {
+  return `
+self.process = undefined;
+self.require = undefined;
+self.addEventListener("error", function (e) { console.error("[Inkstone] worker error:", e.message, e.filename, e.lineno); });
+self.addEventListener("unhandledrejection", function (e) { console.error("[Inkstone] worker rejection:", e.reason && (e.reason.stack || e.reason.message || e.reason)); });
+(function () {
+  // 上游的 Module.printErr 把 /[EWID]\\S+ \\S+ \\S+ (.*)/ 不带锚点地 match，
+  // 于是任何位置命中都会去取 {E,W,I,D}[msg[0]]；消息不以这四个字母开头时
+  // 取到 undefined 直接抛，真正的引擎错误反而被自己的错误处理吞掉。
+  // 这里在 Module 赋值时包一层，既捞回原始信息，也堵住这个上游缺陷。
+  var moduleValue;
+  Object.defineProperty(self, "Module", {
+    configurable: true,
+    get: function () { return moduleValue; },
+    set: function (m) {
+      if (m && typeof m.printErr === "function") {
+        var original = m.printErr;
+        m.printErr = function (msg) {
+          try { original.call(this, msg); }
+          catch (e) { console.error("[Inkstone] RIME:", msg); }
+        };
+      }
+      moduleValue = m;
+    }
+  });
+
+  var MAP = ${JSON.stringify(urls)};
+  var nativeImportScripts = self.importScripts.bind(self);
+  var nativeFetch = self.fetch.bind(self);
+
+  function basename(url) {
+    var s = String(url);
+    var q = s.indexOf("?");
+    if (q >= 0) s = s.slice(0, q);
+    return s.slice(s.lastIndexOf("/") + 1);
+  }
+  function missing(url) {
+    return new Error("Inkstone：资源未内嵌，且运行时不联网 —— " + url);
+  }
+
+  self.importScripts = function () {
+    var local = [];
+    for (var i = 0; i < arguments.length; i++) {
+      var hit = MAP[basename(arguments[i])];
+      console.log("[Inkstone] importScripts", basename(arguments[i]), hit ? "→ 本地" : "→ 未内嵌");
+      if (!hit) throw missing(arguments[i]);
+      local.push(hit);
+    }
+    return nativeImportScripts.apply(null, local);
+  };
+
+  self.fetch = function (input, init) {
+    var url = typeof input === "string" ? input : (input && input.url);
+    var hit = MAP[basename(url)];
+    console.log("[Inkstone] fetch", basename(url), hit ? "→ 本地" : "→ 未内嵌");
+    if (!hit) return Promise.reject(missing(url));
+    return nativeFetch(hit, init);
+  };
+})();
+`;
+}
+
 class RimeWorkerClient {
   private worker: Worker;
   private workerUrl: string;
+  private assetUrls: string[] = [];
   private pending?: PendingCall;
   private chain: Promise<unknown> = Promise.resolve();
   private fatal?: Error;
 
-  constructor(source: string, private log: Logger) {
-    // Electron exposes Node's `process` inside workers. Emscripten then tries to
-    // read the CDN URL with Node's fs module. Hide Node markers so the same
-    // upstream bundle takes its tested Web Worker/fetch path on desktop and iOS.
-    const browserWorkerSource = "self.process=undefined;self.require=undefined;\n" + source;
-    const blob = new Blob([browserWorkerSource], { type: "text/javascript" });
+  constructor(source: string, assets: LocalAssets, private log: Logger) {
+    // 每个内嵌资源做成一个 Blob URL，交给 Worker 里的解析器按文件名取用。
+    const urls: Record<string, string> = {};
+    const track = (name: string, blob: Blob): void => {
+      const url = URL.createObjectURL(blob);
+      this.assetUrls.push(url);
+      urls[name] = url;
+    };
+    track("rime.js", new Blob([assets.script], { type: "text/javascript" }));
+    for (const [name, buffer] of Object.entries(assets.binaries)) {
+      // WebAssembly.compileStreaming 会校验 MIME，给错类型会退回较慢的
+      // ArrayBuffer 路径，还白跑一次编译。
+      const type = name.endsWith(".wasm") ? "application/wasm" : "application/octet-stream";
+      track(name, new Blob([buffer], { type }));
+    }
+
+    // 解析器里也把 Node 标记抹掉：Electron 会在 Worker 里暴露 process，
+    // Emscripten 见到就改走 Node 的 fs 分支，与 iOS 上跑的路径不一致。
+    const blob = new Blob([buildLocalResolver(urls) + "\n" + source], { type: "text/javascript" });
     this.workerUrl = URL.createObjectURL(blob);
     this.worker = new Worker(this.workerUrl);
 
@@ -111,6 +202,8 @@ class RimeWorkerClient {
   destroy(): void {
     this.worker.terminate();
     URL.revokeObjectURL(this.workerUrl);
+    for (const url of this.assetUrls) URL.revokeObjectURL(url);
+    this.assetUrls = [];
   }
 }
 
@@ -288,7 +381,11 @@ export default class InkstonePlugin extends Plugin {
 
     try {
       const t0 = Date.now();
-      this.client = new RimeWorkerClient(workerSource, (message) => this.log(message));
+      const t0assets = Date.now();
+      const assets = await loadLocalAssets();
+      this.log(`内嵌资源解压完成（${Date.now() - t0assets}ms）`);
+
+      this.client = new RimeWorkerClient(workerSource, assets, (message) => this.log(message));
       this.log(`Worker 已创建（${Date.now() - t0}ms）`);
 
       const t1 = Date.now();
@@ -334,21 +431,6 @@ export default class InkstonePlugin extends Plugin {
   }
 
   /** Separates "the CDN is unreachable" from "the page context is not allowed to fetch it". */
-  private async probeNetwork(): Promise<void> {
-    this.log(`navigator.onLine = ${navigator.onLine}`);
-    try {
-      const res = await timeout(requestUrl({ url: PROBE_URL, method: "GET" }), 15000, "网络探测(requestUrl)");
-      this.log(`requestUrl 探测 → HTTP ${res.status}，${res.arrayBuffer.byteLength} 字节`);
-    } catch (error) {
-      this.log(`requestUrl 探测失败 → ${this.errorMessage(error)}`);
-    }
-    try {
-      const res = await timeout(fetch(PROBE_URL, { method: "GET" }), 15000, "网络探测(fetch)");
-      this.log(`fetch 探测 → HTTP ${res.status} ${res.ok ? "ok" : "not ok"}`);
-    } catch (error) {
-      this.log(`fetch 探测失败 → ${this.errorMessage(error)}（若 requestUrl 成功而此处失败，说明是页面安全策略拦截，不是网络问题）`);
-    }
-  }
 
   /* 被动事件探针：只记录，不改变任何行为。用于在 iPad 上看清系统键盘到底发什么事件。 */
 
@@ -518,6 +600,9 @@ export default class InkstonePlugin extends Plugin {
       this.environmentLine(),
       `UA：${navigator.userAgent}`,
       "",
+      "--- 内嵌资源（运行时不联网）---",
+      assetSummary(),
+      "",
       "--- 当前状态 ---",
       `  引擎就绪 ready = ${this.ready}`,
       `  输入模式 mode = ${this.mode}`,
@@ -596,14 +681,6 @@ export default class InkstonePlugin extends Plugin {
       id: "save-report",
       name: "诊断：把报告存进 Vault (save report)",
       callback: () => void this.saveReport()
-    });
-    this.addCommand({
-      id: "probe-network",
-      name: "诊断：网络探测 (network)",
-      callback: () => {
-        void this.probeNetwork().then(() =>
-          new DiagnosticsModal(this.app, this.buildReport(), this.traceRawKeys).open());
-      }
     });
   }
 
