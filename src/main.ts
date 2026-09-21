@@ -3,7 +3,7 @@ import workerSource from "./vendor/my-rime-worker.txt";
 import { assetSummary, loadLocalAssets, type LocalAssets } from "./assets";
 import { searchEmoji, type EmojiEntry } from "./emoji";
 
-const PLUGIN_VERSION = "0.8.0";
+const PLUGIN_VERSION = "0.7.11";
 const INIT_TIMEOUT_MS = 45000;
 const MAX_TRACE = 60;
 const REPORT_FOLDER = "砚台诊断";
@@ -11,6 +11,8 @@ const REPORT_FOLDER = "砚台诊断";
 const IME_WARN_COOLDOWN_MS = 30 * 1000;
 const CJK = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/;
 const EMOJI_PAGE = 7;
+/** 系统表情面板给出的 key：单枚表情、ZWJ 序列、国旗、键帽。CJK 和任何字母（含 é ü）都不算。 */
+const EMOJI_KEY = /\p{Extended_Pictographic}|\p{Emoji_Presentation}|^[\u{1F1E6}-\u{1F1FF}]{2}$|^[0-9#*]\uFE0F?\u20E3$/u;
 
 type Candidate = { text: string; comment?: string };
 type RimeResult = {
@@ -96,14 +98,13 @@ self.addEventListener("unhandledrejection", function (e) { console.error("[Inkst
     return s.slice(s.lastIndexOf("/") + 1);
   }
   function missing(url) {
-    return new Error("Inkstone：资源未内嵌，且运行时不联网 —— " + url);
+    return new Error("Inkstone IME：资源未内嵌，且运行时不联网 —— " + url);
   }
 
   self.importScripts = function () {
     var local = [];
     for (var i = 0; i < arguments.length; i++) {
       var hit = MAP[basename(arguments[i])];
-      console.log("[Inkstone] importScripts", basename(arguments[i]), hit ? "→ 本地" : "→ 未内嵌");
       if (!hit) throw missing(arguments[i]);
       local.push(hit);
     }
@@ -113,7 +114,6 @@ self.addEventListener("unhandledrejection", function (e) { console.error("[Inkst
   self.fetch = function (input, init) {
     var url = typeof input === "string" ? input : (input && input.url);
     var hit = MAP[basename(url)];
-    console.log("[Inkstone] fetch", basename(url), hit ? "→ 本地" : "→ 未内嵌");
     if (!hit) return Promise.reject(missing(url));
     return nativeFetch(hit, init);
   };
@@ -346,6 +346,9 @@ export default class InkstonePlugin extends Plugin {
   private ribbon?: HTMLElement;
   private inputSequence = 0;
   private discardThrough = 0;
+  /* 活动编辑器换了就加一。异步结果带着按键时的 generation，对不上就丢弃，
+     避免切笔记/窗格后把字写进旧 MarkdownView。 */
+  private editorGeneration = 0;
 
   private startedAt = Date.now();
   private diagnostics: string[] = [];
@@ -376,6 +379,9 @@ export default class InkstonePlugin extends Plugin {
     this.createControls();
     this.registerDomEvent(document, "keydown", (event) => this.onKeydown(event), true);
     this.registerDomEvent(document, "keyup", (event) => this.onKeyup(event), true);
+    this.registerDomEvent(document, "focusout", (event) => this.onEditorFocusOut(event), true);
+    this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.invalidateEditorContext("active-leaf-change")));
+    this.registerEvent(this.app.workspace.on("file-open", () => this.invalidateEditorContext("file-open")));
     this.registerInputProbes();
     this.updateStatus("正在加载…");
 
@@ -607,6 +613,7 @@ export default class InkstonePlugin extends Plugin {
       `  引擎就绪 ready = ${this.ready}`,
       `  输入模式 mode = ${this.mode}`,
       `  组合中 composing = ${this.composing}`,
+      `  编辑器 generation = ${this.editorGeneration}`,
       `  初始化错误 = ${this.initError ?? "(无)"}`,
       "",
       "--- 按键捕获 ---",
@@ -802,7 +809,8 @@ export default class InkstonePlugin extends Plugin {
 
      既然按键送到了，就由砚台自己写进文档，不再看系统脸色。preventDefault 掐掉系统
      那条不稳的插入路径，所以不会重复上屏。
-     判据刻意收窄：keyCode 必须为 0、code 未识别、key 含非 ASCII——正常打字碰不到。 */
+     结构判据：keyCode=0、code 未识别、无修饰键。内容判据用 Unicode 表情属性，
+     排除 CJK 和任何字母（含 é ü），避免把非表情的非 ASCII 键当表情插入。 */
   private isPickerChar(event: KeyboardEvent): boolean {
     if (event.metaKey || event.ctrlKey || event.altKey) return false;
     if (event.keyCode !== 0) return false;
@@ -810,7 +818,8 @@ export default class InkstonePlugin extends Plugin {
     const key = event.key;
     if (!key) return false;
     if (/^[A-Z][A-Za-z]+$/.test(key)) return false; // Enter / Shift / Unidentified 这类具名键
-    return /[^\x00-\x7F]/.test(key);
+    if (CJK.test(key) || /\p{L}/u.test(key)) return false;
+    return EMOJI_KEY.test(key);
   }
 
   private insertPickerChar(event: KeyboardEvent): void {
@@ -876,8 +885,9 @@ export default class InkstonePlugin extends Plugin {
     this.pendingTrace = -1;
 
     const sequence = ++this.inputSequence;
+    const generation = this.editorGeneration;
     void this.client!.call<RimeResult>("process", rimeKey)
-      .then((result) => this.applyResult(result, event.key, view, sequence))
+      .then((result) => this.applyResult(result, event.key, view, sequence, generation))
       .catch((error) => {
         console.error("RIME input failed", error);
         this.log(`process("${rimeKey}") 失败：${this.errorMessage(error)}`);
@@ -909,8 +919,8 @@ export default class InkstonePlugin extends Plugin {
     return mapped ? `{${mapped}}` : undefined;
   }
 
-  private applyResult(result: RimeResult, originalKey: string, view: MarkdownView, sequence: number): void {
-    if (sequence <= this.discardThrough) return;
+  private applyResult(result: RimeResult, originalKey: string, view: MarkdownView, sequence: number, generation: number): void {
+    if (sequence <= this.discardThrough || generation !== this.editorGeneration) return;
     if (result.state === 0) {
       this.composing = false;
       if (result.committed) view.editor.replaceSelection(result.committed);
@@ -1080,12 +1090,32 @@ export default class InkstonePlugin extends Plugin {
       });
       button.addEventListener("pointerdown", (event) => event.preventDefault());
       button.addEventListener("click", () => {
+        const sequence = ++this.inputSequence;
+        const generation = this.editorGeneration;
         void this.client!.call<string>("selectCandidateOnCurrentPage", index)
-          .then((raw) => this.applyResult(JSON.parse(raw) as RimeResult, "", view, ++this.inputSequence));
+          .then((raw) => this.applyResult(JSON.parse(raw) as RimeResult, "", view, sequence, generation));
       });
     });
     this.positionPanel(view);
     this.panel.addClass("is-visible");
+  }
+
+  /* 活动编辑器不再是按下那一键时的那个。作废在途结果，并清掉引擎组合态，
+     否则下一篇笔记里的按键会接着上一篇的拼音缓冲。 */
+  private invalidateEditorContext(reason: string): void {
+    this.editorGeneration += 1;
+    const noteworthy = this.composing || this.emojiQuery.length > 0 || Boolean(this.panel?.classList.contains("is-visible"));
+    this.cancelComposition();
+    this.clearEmoji();
+    if (noteworthy) this.log(`作废编辑器上下文（${reason}）generation=${this.editorGeneration}`);
+  }
+
+  private onEditorFocusOut(event: FocusEvent): void {
+    if (!this.isEditorTarget(event.target)) return;
+    const next = event.relatedTarget;
+    if (next instanceof Node && this.panel?.contains(next)) return;
+    if (this.isEditorTarget(next)) return;
+    this.invalidateEditorContext("focusout");
   }
 
   private cancelComposition(): void {

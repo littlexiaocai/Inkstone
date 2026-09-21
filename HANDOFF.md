@@ -1,6 +1,6 @@
-# 砚台输入法 / Inkstone —— 交接文档
+# 砚台输入法 / Inkstone IME —— 交接文档
 
-写给接手这个项目的人（或 AI）。截至 2026-09-21，分支 `offline-0.8.0`，提交 `84b810e`。
+写给接手这个项目的人（或 AI）。截至 2026-09-21，分支 `offline-0.8.0`，提交 `84b810e`。版本已改回 **0.7.11**（用户明确要求按 0.01 递增，不跳大版本）。
 
 本文档的组织原则：**区分「已验证」和「写完了但没验」**。这个项目里绝大多数坑，
 都来自把后者当成前者。下面每一条都标了验证方式。
@@ -27,10 +27,10 @@ Obsidian 插件。在编辑器内部接管按键，用本地 RIME 引擎完成�
 
 | 项 | 值 |
 |---|---|
-| 工作分支 | `offline-0.8.0`（领先 `main` 4 个提交，**未推送**） |
-| 版本 | 0.8.0 |
-| GitHub `main` | 停在 `e6273e7`（0.7.10 时期） |
-| 最新 Release | **0.7.10**（联网版）。0.8.0 尚未发布 |
+| 工作分支 | `offline-0.8.0`（领先 `main` 4 个提交，**未推送**；分支名仍带 0.8.0，产品版本是 0.7.11） |
+| 版本 | **0.7.11** |
+| GitHub `main` | 发布 0.7.11 时推上去 |
+| 最新 Release | **0.7.11**（离线版；目录名 Inkstone IME） |
 | `dist/main.js` | 6.6 MB（完全内嵌引擎与词库） |
 | 仓库 | https://github.com/littlexiaocai/Inkstone （公开，AGPL-3.0-or-later） |
 
@@ -61,7 +61,7 @@ Obsidian 插件。在编辑器内部接管按键，用本地 RIME 引擎完成�
 - **英文模式下插件完全透明**：不拦截任何按键，打出什么取决于系统输入源。
 - 表情模式由独立命令进入，在表情模式下按切换键直接回中文。
 
-### 3.3 完全离线（0.8.0 的核心改动）
+### 3.3 完全离线（0.7.11 的核心改动）
 
 引擎与词库在构建期内嵌进 `main.js`，**运行时不发任何网络请求**。
 
@@ -121,7 +121,7 @@ Blob URL，然后调**原生**的 `importScripts` / `fetch`。
 ### iPad 实机（M1 iPad Pro / iPadOS 27.0 / Obsidian 1.13.7 / 妙控键盘）
 
 - 外接键盘下中文输入流畅，核心产品假设成立
-- **0.8.0 离线版冷启动 178ms**（解压 35ms）。比 Mac 的 305ms 还快——
+- **0.7.11 离线版冷启动 178ms**（解压 35ms）。比 Mac 的 305ms 还快——
   6.6 MB 的体积代价在 M1 iPad 上实测不存在
 - `引擎就绪 = true`、`初始化错误 =（无）`、`截获 222` 次真实按键
 - 地球键调出的系统表情面板能稳定进入文档（0.7.7 起由插件接管）
@@ -134,7 +134,7 @@ Blob URL，然后调**原生**的 `importScripts` / `fetch`。
 - 表情模式关键词搜索：`xiao` → 😀😄😁，`huo` → 🔥🚀
 - Shift 循环：中 → 英 → 中；从表情模式按 Shift 回中文
 - 系统输入法接管时的提示；切回英文后的「已就绪」提示
-- **0.8.0 离线路径**：解析器只解析出本地资源、零网络请求、零报错，
+- **0.7.11 离线路径**：解析器只解析出本地资源、零网络请求、零报错，
   `yanchi` 出候选、空格上屏「延迟」一次
 
 ### 工程
@@ -165,18 +165,17 @@ Blob URL，然后调**原生**的 `importScripts` / `fetch`。
 
 ### P0 —— 上架前必须做
 
-1. **修两个数据正确性边界**（来自 Codex 审核第 6 项，**尚未动手**）
-   - 异步结果仍持有按键发生时捕获的 `MarkdownView`。用户在结果回来前切换笔记或
-     窗格，可能把提交写进**旧编辑器**。需要给活动编辑器建 generation/token，
-     并在 `active-leaf-change`、`file-open`、失焦时取消组合、作废在途结果。
-   - `isPickerChar()` 把「`keyCode=0` + `code` 未识别 + 含非 ASCII」的字符都当系统
-     表情，范围**大于 emoji**。应改用 Unicode emoji 属性或明确范围，至少排除 CJK
-     和重音字母。
+1. **修两个数据正确性边界**（来自 Codex 审核第 6 项）— **代码已改，桌面/iPad 实机未验**
+   - 异步结果带着按键时的 `editorGeneration`。`active-leaf-change`、`file-open`、
+     编辑器 `focusout`（焦点不是候选栏）会 `invalidateEditorContext`：generation +1、
+     取消组合、作废在途结果。`applyResult` 对不上 generation 就丢弃。
+   - `isPickerChar()` 改为 Unicode 表情属性（`Extended_Pictographic` / 国旗 / 键帽），
+     并显式排除 CJK 和 `\p{L}`（含 é ü）。Node 侧用例过了；iPad 地球键表情未复测。
 
-2. **摘掉解析器里的两行 `console.log`**（`src/main.ts` 的 `buildLocalResolver` 内）。
-   排查时价值极大，但每次加载都会打印，审核可能嫌吵。
+2. **摘掉解析器里的两行 `console.log`** — **已做**（`buildLocalResolver` 的
+   `importScripts` / `fetch` 不再打印）。
 
-3. **合上 `main` 并发布 0.8.0**：tag 必须与 `manifest.json` 的 version 完全一致
+3. **合上 `main` 并发布 0.7.11**：tag 必须与 `manifest.json` 的 version 完全一致
    （不带 `v` 前缀），Release 里 `main.js` / `manifest.json` / `styles.css` 要作为
    **独立文件**上传，不能只给 zip。
 
@@ -187,7 +186,7 @@ Blob URL，然后调**原生**的 `importScripts` / `fetch`。
 
 已经满足的硬性要求（都核过）：
 
-- `manifest.name` 必须是 Basic Latin → 已改为 `Inkstone`（中文名继续用于 README、
+- `manifest.name` 必须是 Basic Latin → 已改为 `Inkstone IME`（中文名继续用于 README、
   设置页、命令、提示文案）
 - `description` ≤250 字符且以 ASCII 句号结尾 → 已改
 - `id` 不含 `obsidian`、不以 `plugin` 结尾 → `inkstone`
@@ -198,7 +197,7 @@ Blob URL，然后调**原生**的 `importScripts` / `fetch`。
 - 根目录有 README / LICENSE / manifest.json → 齐全
 
 **最大的历史风险已解除**：0.7.x 在运行时从 jsDelivr 下载并执行 `rime.js` 和
-`rime.wasm`，这是审核明确针对的远程代码执行。0.8.0 完全内嵌后不再有这条路径。
+`rime.wasm`，这是审核明确针对的远程代码执行。0.7.11 完全内嵌后不再有这条路径。
 
 ### P2 —— 工程化
 
