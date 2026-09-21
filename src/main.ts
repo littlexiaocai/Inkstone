@@ -1,9 +1,9 @@
-import { App, MarkdownView, Modal, Notice, Platform, Plugin, PluginSettingTab, Setting, setIcon } from "obsidian";
+import { App, MarkdownView, Modal, Notice, Platform, Plugin, PluginSettingTab, Setting, SettingDefinitionItem, setIcon } from "obsidian";
 import workerSource from "./vendor/my-rime-worker.txt";
 import { assetSummary, loadLocalAssets, type LocalAssets } from "./assets";
 import { searchEmoji, type EmojiEntry } from "./emoji";
 
-const PLUGIN_VERSION = "0.7.12";
+const PLUGIN_VERSION = "0.7.13";
 const INIT_TIMEOUT_MS = 45000;
 const MAX_TRACE = 60;
 const REPORT_FOLDER = "就打个字诊断";
@@ -34,14 +34,22 @@ type PendingCall = {
   reject: (reason: Error) => void;
 };
 
+type WorkerReply =
+  | { type: "control"; args?: unknown; name?: string }
+  | { type: "success"; result: unknown }
+  | { type: "error"; error?: { message?: string } };
+
 type Logger = (message: string) => void;
 
 function timeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`${label} 超时（${Math.round(ms / 1000)} 秒无响应）`)), ms);
+    const timer = window.setTimeout(() => reject(new Error(`${label} 超时（${Math.round(ms / 1000)} 秒无响应）`)), ms);
     promise.then(
-      (value) => { clearTimeout(timer); resolve(value); },
-      (error) => { clearTimeout(timer); reject(error); }
+      (value) => { window.clearTimeout(timer); resolve(value); },
+      (error: unknown) => {
+        window.clearTimeout(timer);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      }
     );
   });
 }
@@ -151,17 +159,17 @@ class RimeWorkerClient {
     this.workerUrl = URL.createObjectURL(blob);
     this.worker = new Worker(this.workerUrl);
 
-    this.worker.addEventListener("message", (event: MessageEvent) => {
+    this.worker.addEventListener("message", (event: MessageEvent<WorkerReply>) => {
       const message = event.data;
-      if (message?.type === "control") {
+      if (message.type === "control") {
         this.log(`worker control: ${JSON.stringify(message.args ?? message.name ?? "")}`.slice(0, 200));
         return;
       }
       const pending = this.pending;
       this.pending = undefined;
       if (!pending) return;
-      if (message?.type === "success") pending.resolve(message.result);
-      else pending.reject(new Error(message?.error?.message ?? "RIME Worker 调用失败"));
+      if (message.type === "success") pending.resolve(message.result);
+      else pending.reject(new Error(message.error?.message ?? "RIME Worker 调用失败"));
     });
 
     this.worker.addEventListener("error", (event: ErrorEvent) => {
@@ -271,6 +279,32 @@ class JustTypeSettingTab extends PluginSettingTab {
     super(app, plugin);
   }
 
+  getSettingDefinitions(): SettingDefinitionItem[] {
+    return [{
+      name: "中英文切换键",
+      desc: "单独按一下这个键（中间不夹别的键）在中文和英文之间切换。命令面板里的「切换中英文 (toggle)」始终可用，也可以在 Obsidian 的快捷键设置里自行绑定。",
+      aliases: ["toggle", "Shift", "chinese", "english"],
+      control: {
+        type: "dropdown",
+        key: "toggleKey",
+        options: { ...TOGGLE_KEY_LABEL }
+      }
+    }];
+  }
+
+  getControlValue(key: string): unknown {
+    if (key === "toggleKey") return this.plugin.settings.toggleKey;
+    return super.getControlValue(key);
+  }
+
+  setControlValue(key: string, value: unknown): void | Promise<void> {
+    if (key === "toggleKey") {
+      this.plugin.settings.toggleKey = value as ToggleKey;
+      return this.plugin.saveData(this.plugin.settings);
+    }
+    return super.setControlValue(key, value);
+  }
+
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
@@ -313,16 +347,19 @@ class DiagnosticsModal extends Modal {
 
     const actions = contentEl.createDiv({ cls: "just-type-diag-actions" });
     const copyButton = actions.createEl("button", { text: "复制报告", cls: "mod-cta" });
-    copyButton.addEventListener("click", async () => {
-      try {
-        await navigator.clipboard.writeText(this.report);
-        copyButton.setText("已复制");
-      } catch {
-        area.select();
-        const ok = document.execCommand("copy");
-        copyButton.setText(ok ? "已复制" : "复制失败，请手动选中");
-      }
-      setTimeout(() => copyButton.setText("复制报告"), 1600);
+    copyButton.addEventListener("click", () => {
+      const reset = (): void => {
+        window.setTimeout(() => copyButton.setText("复制报告"), 1600);
+      };
+      navigator.clipboard.writeText(this.report).then(
+        () => { copyButton.setText("已复制"); reset(); },
+        () => {
+          area.select();
+          const ok = document.execCommand("copy");
+          copyButton.setText(ok ? "已复制" : "复制失败，请手动选中");
+          reset();
+        }
+      );
     });
     actions.createEl("button", { text: "关闭" }).addEventListener("click", () => this.close());
   }
@@ -604,7 +641,6 @@ export default class JustTypePlugin extends Plugin {
       `生成时间：${new Date().toLocaleString()}`,
       `插件版本：${PLUGIN_VERSION}`,
       this.environmentLine(),
-      `UA：${navigator.userAgent}`,
       "",
       "--- 内嵌资源（运行时不联网）---",
       assetSummary(),

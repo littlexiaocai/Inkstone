@@ -1,5 +1,25 @@
 # Just Type · 就打个字
 
+Just Type is an Obsidian Chinese IME for iPad hardware keyboards. It bypasses the long-standing lag of the system Pinyin IME inside Obsidian.
+
+I only wanted to write Chinese with a keyboard on iPad. I ended up writing an input method first. It only improves typing in Obsidian; it cannot fix the system IME. Other iPad apps still have to wait for Apple.
+
+This is the workaround I made for myself. I hope it becomes unnecessary soon.
+
+## How to use
+
+1. Switch the system keyboard to **English ABC**. Just Type takes over and you can type Chinese.
+2. Switch the system keyboard back to Pinyin, and Just Type steps aside. Keystrokes go to the system IME.
+3. Press **Shift** (tap it alone) to toggle Chinese and English inside Just Type. You can change this key in plugin settings.
+
+## Installation
+
+Copy `main.js`, `manifest.json`, and `styles.css` from the GitHub Release into your vault at `.obsidian/plugins/just-type/`. Restart Obsidian, then enable **Just Type IME** under Settings → Community plugins.
+
+The plugin does not use the network at runtime. The RIME engine and dictionaries ship inside `main.js` (about 6.6 MB).
+
+---
+
 ### 为什么会有这个项目
 
 Just Type 是一个面向 iPad 外接键盘的 Obsidian 中文输入插件，用来绕开长期存在的中文输入卡顿问题。

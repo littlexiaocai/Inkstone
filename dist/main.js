@@ -409,7 +409,7 @@ function searchEmoji(query, limit) {
 }
 
 // src/main.ts
-var PLUGIN_VERSION = "0.7.12";
+var PLUGIN_VERSION = "0.7.13";
 var INIT_TIMEOUT_MS = 45e3;
 var MAX_TRACE = 60;
 var REPORT_FOLDER = "\u5C31\u6253\u4E2A\u5B57\u8BCA\u65AD";
@@ -419,15 +419,15 @@ var EMOJI_PAGE = 7;
 var EMOJI_KEY = /\p{Extended_Pictographic}|\p{Emoji_Presentation}|^[\u{1F1E6}-\u{1F1FF}]{2}$|^[0-9#*]\uFE0F?\u20E3$/u;
 function timeout(promise, ms, label) {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`${label} \u8D85\u65F6\uFF08${Math.round(ms / 1e3)} \u79D2\u65E0\u54CD\u5E94\uFF09`)), ms);
+    const timer = window.setTimeout(() => reject(new Error(`${label} \u8D85\u65F6\uFF08${Math.round(ms / 1e3)} \u79D2\u65E0\u54CD\u5E94\uFF09`)), ms);
     promise.then(
       (value) => {
-        clearTimeout(timer);
+        window.clearTimeout(timer);
         resolve(value);
       },
       (error) => {
-        clearTimeout(timer);
-        reject(error);
+        window.clearTimeout(timer);
+        reject(error instanceof Error ? error : new Error(String(error)));
       }
     );
   });
@@ -513,15 +513,15 @@ var RimeWorkerClient = class {
     this.worker = new Worker(this.workerUrl);
     this.worker.addEventListener("message", (event) => {
       const message = event.data;
-      if (message?.type === "control") {
+      if (message.type === "control") {
         this.log(`worker control: ${JSON.stringify(message.args ?? message.name ?? "")}`.slice(0, 200));
         return;
       }
       const pending = this.pending;
       this.pending = void 0;
       if (!pending) return;
-      if (message?.type === "success") pending.resolve(message.result);
-      else pending.reject(new Error(message?.error?.message ?? "RIME Worker \u8C03\u7528\u5931\u8D25"));
+      if (message.type === "success") pending.resolve(message.result);
+      else pending.reject(new Error(message.error?.message ?? "RIME Worker \u8C03\u7528\u5931\u8D25"));
     });
     this.worker.addEventListener("error", (event) => {
       const detail = [
@@ -601,6 +601,29 @@ var JustTypeSettingTab = class extends import_obsidian.PluginSettingTab {
     super(app, plugin);
     this.plugin = plugin;
   }
+  getSettingDefinitions() {
+    return [{
+      name: "\u4E2D\u82F1\u6587\u5207\u6362\u952E",
+      desc: "\u5355\u72EC\u6309\u4E00\u4E0B\u8FD9\u4E2A\u952E\uFF08\u4E2D\u95F4\u4E0D\u5939\u522B\u7684\u952E\uFF09\u5728\u4E2D\u6587\u548C\u82F1\u6587\u4E4B\u95F4\u5207\u6362\u3002\u547D\u4EE4\u9762\u677F\u91CC\u7684\u300C\u5207\u6362\u4E2D\u82F1\u6587 (toggle)\u300D\u59CB\u7EC8\u53EF\u7528\uFF0C\u4E5F\u53EF\u4EE5\u5728 Obsidian \u7684\u5FEB\u6377\u952E\u8BBE\u7F6E\u91CC\u81EA\u884C\u7ED1\u5B9A\u3002",
+      aliases: ["toggle", "Shift", "chinese", "english"],
+      control: {
+        type: "dropdown",
+        key: "toggleKey",
+        options: { ...TOGGLE_KEY_LABEL }
+      }
+    }];
+  }
+  getControlValue(key) {
+    if (key === "toggleKey") return this.plugin.settings.toggleKey;
+    return super.getControlValue(key);
+  }
+  setControlValue(key, value) {
+    if (key === "toggleKey") {
+      this.plugin.settings.toggleKey = value;
+      return this.plugin.saveData(this.plugin.settings);
+    }
+    return super.setControlValue(key, value);
+  }
   display() {
     const { containerEl } = this;
     containerEl.empty();
@@ -636,16 +659,22 @@ var DiagnosticsModal = class extends import_obsidian.Modal {
     area.rows = 18;
     const actions = contentEl.createDiv({ cls: "just-type-diag-actions" });
     const copyButton = actions.createEl("button", { text: "\u590D\u5236\u62A5\u544A", cls: "mod-cta" });
-    copyButton.addEventListener("click", async () => {
-      try {
-        await navigator.clipboard.writeText(this.report);
-        copyButton.setText("\u5DF2\u590D\u5236");
-      } catch {
-        area.select();
-        const ok = document.execCommand("copy");
-        copyButton.setText(ok ? "\u5DF2\u590D\u5236" : "\u590D\u5236\u5931\u8D25\uFF0C\u8BF7\u624B\u52A8\u9009\u4E2D");
-      }
-      setTimeout(() => copyButton.setText("\u590D\u5236\u62A5\u544A"), 1600);
+    copyButton.addEventListener("click", () => {
+      const reset = () => {
+        window.setTimeout(() => copyButton.setText("\u590D\u5236\u62A5\u544A"), 1600);
+      };
+      navigator.clipboard.writeText(this.report).then(
+        () => {
+          copyButton.setText("\u5DF2\u590D\u5236");
+          reset();
+        },
+        () => {
+          area.select();
+          const ok = document.execCommand("copy");
+          copyButton.setText(ok ? "\u5DF2\u590D\u5236" : "\u590D\u5236\u5931\u8D25\uFF0C\u8BF7\u624B\u52A8\u9009\u4E2D");
+          reset();
+        }
+      );
     });
     actions.createEl("button", { text: "\u5173\u95ED" }).addEventListener("click", () => this.close());
   }
@@ -872,7 +901,6 @@ var JustTypePlugin = class extends import_obsidian.Plugin {
       `\u751F\u6210\u65F6\u95F4\uFF1A${(/* @__PURE__ */ new Date()).toLocaleString()}`,
       `\u63D2\u4EF6\u7248\u672C\uFF1A${PLUGIN_VERSION}`,
       this.environmentLine(),
-      `UA\uFF1A${navigator.userAgent}`,
       "",
       "--- \u5185\u5D4C\u8D44\u6E90\uFF08\u8FD0\u884C\u65F6\u4E0D\u8054\u7F51\uFF09---",
       assetSummary(),
