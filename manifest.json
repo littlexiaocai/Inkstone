@@ -1,9 +1,9 @@
 {
   "id": "inkstone",
-  "name": "砚台输入法",
+  "name": "Inkstone",
   "version": "0.7.11",
   "minAppVersion": "1.5.0",
-  "description": "在 Obsidian 编辑器内直接输入中文与表情，绕开系统中文输入法的延迟。引擎基于 RIME。",
+  "description": "Type Chinese directly in the editor with the RIME engine, bypassing the system input method.",
   "author": "littlexiaocai",
   "authorUrl": "https://github.com/littlexiaocai/Inkstone",
   "isDesktopOnly": false
