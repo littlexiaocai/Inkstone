@@ -1,6 +1,8 @@
 # Upstream components
 
-Inkstone (砚台输入法) embeds the unmodified production Worker from:
+Inkstone (砚台输入法) does not fetch anything at runtime. The RIME engine and the
+pinyin schemas are bundled into `main.js` at build time, which means this
+repository and every release **redistribute** the upstream artifacts listed below.
 
 - Project: My RIME
 - Version: 0.10.9
@@ -8,4 +10,16 @@ Inkstone (砚台输入法) embeds the unmodified production Worker from:
 - Package: https://www.npmjs.com/package/@libreservice/my-rime/v/0.10.9
 - License: AGPL-3.0-or-later
 
-The embedded file is `src/vendor/my-rime-worker.txt`, copied from the npm package's `dist/worker.js`. At runtime it downloads the matching RIME JavaScript, WebAssembly data, and the selected schema from the URLs defined by that upstream Worker.
+The unmodified production Worker is `src/vendor/my-rime-worker.txt`, copied from
+the npm package's `dist/worker.js`. Its engine files (`rime.js`, `rime.wasm`,
+`rime.data`) and the schema packages are fetched at build time by
+`scripts/fetch-assets.mjs`; their source URLs and sha256 digests are recorded in
+`src/assets/ASSETS.json`.
+
+The Worker is embedded verbatim. Inkstone does not patch it: a resolver injected
+ahead of it rewrites the two resource entry points (`importScripts` and `fetch`)
+to local Blob URLs, and fails loudly rather than falling back to the network.
+
+For the full list of bundled third-party works and their licenses — including the
+Apache-2.0 pinyin-simp schema and the LGPL-3.0 stroke schema — see
+`THIRD_PARTY_NOTICES.md`.
