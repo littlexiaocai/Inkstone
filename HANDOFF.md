@@ -28,10 +28,10 @@ Obsidian 插件。在编辑器内部接管按键，用本地 RIME 引擎完成�
 | 项 | 值 |
 |---|---|
 | 工作分支 | `main`（`fcc14c2`，已推送）。历史分支名 `offline-0.8.0` 已合入 |
-| 版本 | **0.7.11** |
-| GitHub `main` | `fcc14c2`（已推送） |
-| 最新 Release | **0.7.11**（离线版；目录名 Just Type IME） |
-| `dist/main.js` | 6.6 MB（完全内嵌引擎与词库） |
+| 版本 | **0.7.14** |
+| GitHub `main` | 发布时推送 |
+| 最新 Release | **0.7.14**（离线版；无 stroke；拦 XMLHttpRequest） |
+| `dist/main.js` | 约 3.0 MB |
 | 对外名称 | Just Type · 就打个字（目录名 `Just Type IME`）。插件 id 是 `just-type` |
 | 仓库 | https://github.com/littlexiaocai/just-type （公开，AGPL-3.0-or-later） |
 
@@ -101,17 +101,12 @@ Blob URL，然后调**原生**的 `importScripts` / `fetch`。
 |---|---:|---:|
 | `rime.js`（原文） | 0.11 MB | 0.11 MB |
 | `rime.wasm` + `rime.data` | 3.81 MB | 1.37 MB |
-| `pinyin_simp` 四件套 | 1.58 MB | 0.72 MB |
-| `stroke` 四件套 | 6.01 MB | 2.71 MB |
-| **合计** | **11.52 MB** | **4.91 MB** → base64 后 `main.js` 6.6 MB |
+| `pinyin_simp` 四件套（已裁笔画反查） | 1.58 MB | 0.72 MB |
+| **合计** | **5.50 MB** | **2.21 MB** → base64 后 `main.js` 约 3.0 MB |
 
-**`pinyin_simp` 依赖 `stroke`**（反引号笔画反查），这是 Worker 里硬编码的依赖表
-（`pinyin_simp: ["stroke"]`）。`stroke` 占了内嵌体积一半以上。
-
-删掉它能把 `main.js` 压到约 3.1 MB，但要同时改两处：Worker 里那张**压缩过的**
-依赖表（变量名是 `bi` 这种），以及给 `pinyin_simp.schema.yaml` 打构建期补丁删掉
-`reverse_lookup` 相关块。用户**明确选择保留**笔画反查（方案 C），所以这条没做。
-如果将来要做，补丁必须带断言：打不上就让构建失败，而不是悄悄产出一个会联网的包。
+0.7.14 起**不再内嵌 stroke**。Worker 依赖表 `bi=["stroke"]` 改成 `bi=[]`（必须命中一次），
+`pinyin_simp.schema.yaml` 构建期删掉 `reverse_lookup` 与 `dependencies: [stroke]`。
+解析器同时拦截 `XMLHttpRequest.open`，否则 `rime.data` 仍会打到 jsDelivr。
 
 ---
 
@@ -123,7 +118,7 @@ Blob URL，然后调**原生**的 `importScripts` / `fetch`。
 
 - 外接键盘下中文输入流畅，核心产品假设成立
 - **0.7.11 离线版冷启动 178ms**（解压 35ms）。比 Mac 的 305ms 还快——
-  6.6 MB 的体积代价在 M1 iPad 上实测不存在
+  当时 main.js 6.6 MB（含 stroke）；0.7.14 起约 3.0 MB
 - `引擎就绪 = true`、`初始化错误 =（无）`、`截获 222` 次真实按键
 - 地球键调出的系统表情面板能稳定进入文档（0.7.7 起由插件接管）
 
@@ -213,7 +208,7 @@ https://github.com/littlexiaocai/just-type 。
 
 - 是否给「切换表情模式」绑快捷键（目前只能从命令面板进）
 - 是否保留内嵌表情模式。用户的口径是**不强调**它（日常用系统地球键），但功能保留
-- 是否删掉 `stroke` 换取体积（见 §3.4）
+- ~~是否删掉 `stroke` 换取体积~~ 0.7.14 已删
 
 ---
 

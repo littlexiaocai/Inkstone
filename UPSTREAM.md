@@ -16,10 +16,18 @@ the npm package's `dist/worker.js`. Its engine files (`rime.js`, `rime.wasm`,
 `scripts/fetch-assets.mjs`; their source URLs and sha256 digests are recorded in
 `src/assets/ASSETS.json`.
 
-The Worker is embedded verbatim. Just Type IME does not patch it: a resolver injected
-ahead of it rewrites the two resource entry points (`importScripts` and `fetch`)
-to local Blob URLs, and fails loudly rather than falling back to the network.
+A resolver injected ahead of the Worker rewrites `importScripts`, `fetch`, and
+`XMLHttpRequest.open` to local Blob URLs, and fails loudly rather than falling
+back to the network.
 
-For the full list of bundled third-party works and their licenses — including the
-Apache-2.0 pinyin-simp schema and the LGPL-3.0 stroke schema — see
+The Worker is otherwise unmodified except one fail-loud substitution:
+`pinyin_simp`'s dependency list `bi=["stroke"]` becomes `bi=[]`. The product
+does not use stroke reverse lookup; keeping that edge would pull in `luna_pinyin`.
+The substitution must match exactly once or startup throws.
+
+`pinyin_simp.schema.yaml` is trimmed the same way at fetch time (see
+`scripts/fetch-assets.mjs`). Upstream bytes are pinned in
+`src/assets/assets.lock.json`.
+
+For the full list of bundled third-party works and their licenses, see
 `THIRD_PARTY_NOTICES.md`.

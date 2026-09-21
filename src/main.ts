@@ -3,7 +3,7 @@ import workerSource from "./vendor/my-rime-worker.txt";
 import { assetSummary, loadLocalAssets, type LocalAssets } from "./assets";
 import { searchEmoji, type EmojiEntry } from "./emoji";
 
-const PLUGIN_VERSION = "0.7.13";
+const PLUGIN_VERSION = "0.7.14";
 const INIT_TIMEOUT_MS = 45000;
 const MAX_TRACE = 60;
 const REPORT_FOLDER = "就打个字诊断";
@@ -57,10 +57,10 @@ function timeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> 
 /**
  * 注入 Worker 的本地资源解析器。
  *
- * 上游 Worker 通过两个入口取资源：一处 importScripts 拉 rime.js，一处 fetch 拉
- * wasm / data / 方案文件。主线程在建 Worker 之前已把内嵌资源解压成 Blob URL，
- * 这段 shim 只做一件事：把上游拼出来的 CDN 地址换成对应的本地 Blob URL，然后
- * 调用原生实现。
+ * 上游 Worker 通过三个入口取资源：importScripts 拉 rime.js，fetch 拉 wasm / 方案，
+ * XMLHttpRequest 拉 rime.data（Emscripten 文件包走这条，不走 fetch）。
+ * 主线程在建 Worker 之前已把内嵌资源解压成 Blob URL，这段 shim 只做一件事：
+ * 把上游拼出来的 CDN 地址换成对应的本地 Blob URL，然后调用原生实现。
  *
  * 不用消息传递、不接管 onmessage、不 eval——映射表在建 Worker 时就写死在源码里，
  * 没有先后顺序可言，也就没有竞态。
@@ -98,6 +98,7 @@ self.addEventListener("unhandledrejection", function (e) { console.error("[Just 
   var MAP = ${JSON.stringify(urls)};
   var nativeImportScripts = self.importScripts.bind(self);
   var nativeFetch = self.fetch.bind(self);
+  var nativeXhrOpen = self.XMLHttpRequest.prototype.open;
 
   function basename(url) {
     var s = String(url);
@@ -125,8 +126,32 @@ self.addEventListener("unhandledrejection", function (e) { console.error("[Just 
     if (!hit) return Promise.reject(missing(url));
     return nativeFetch(hit, init);
   };
+
+  self.XMLHttpRequest.prototype.open = function (method, url) {
+    var hit = MAP[basename(url)];
+    if (!hit) throw missing(url);
+    var args = Array.prototype.slice.call(arguments);
+    args[1] = hit;
+    return nativeXhrOpen.apply(this, args);
+  };
 })();
 `;
+}
+
+/** My RIME worker 里 pinyin_simp 的依赖表是 bi=["stroke"]。产品不用笔画反查，改成空数组。必须只命中一次。 */
+const WORKER_STROKE_DEP = "bi=[\"stroke\"]";
+
+function patchWorkerSource(source: string): string {
+  const hits = source.split(WORKER_STROKE_DEP).length - 1;
+  if (hits !== 1) {
+    throw new Error(`Just Type：worker 依赖表补丁应命中 1 次，实际 ${hits}。上游 worker 可能已变化。`);
+  }
+  return source.replace(WORKER_STROKE_DEP, "bi=[]");
+}
+
+/** 系统 IME 正在组合时，浏览器把这次 keydown 标成 keyCode 229。这是平台事实，不是按键身份。 */
+function isSystemImeComposing(event: KeyboardEvent): boolean {
+  return event.isComposing || event.keyCode === 229;
 }
 
 class RimeWorkerClient {
@@ -155,7 +180,7 @@ class RimeWorkerClient {
 
     // 解析器里也把 Node 标记抹掉：Electron 会在 Worker 里暴露 process，
     // Emscripten 见到就改走 Node 的 fs 分支，与 iOS 上跑的路径不一致。
-    const blob = new Blob([buildLocalResolver(urls) + "\n" + source], { type: "text/javascript" });
+    const blob = new Blob([buildLocalResolver(urls) + "\n" + patchWorkerSource(source)], { type: "text/javascript" });
     this.workerUrl = URL.createObjectURL(blob);
     this.worker = new Worker(this.workerUrl);
 
@@ -290,19 +315,6 @@ class JustTypeSettingTab extends PluginSettingTab {
         options: { ...TOGGLE_KEY_LABEL }
       }
     }];
-  }
-
-  getControlValue(key: string): unknown {
-    if (key === "toggleKey") return this.plugin.settings.toggleKey;
-    return super.getControlValue(key);
-  }
-
-  setControlValue(key: string, value: unknown): void | Promise<void> {
-    if (key === "toggleKey") {
-      this.plugin.settings.toggleKey = value as ToggleKey;
-      return this.plugin.saveData(this.plugin.settings);
-    }
-    return super.setControlValue(key, value);
   }
 
   display(): void {
@@ -811,7 +823,7 @@ export default class JustTypePlugin extends Plugin {
     if (!this.isEditorTarget(event.target)) return this.skip("焦点不在编辑器");
     // The system IME is still composing (it was left on a Chinese layout). Letting
     // RIME also consume the key commits the same word twice.
-    if (event.isComposing || event.keyCode === 229) return this.skip("系统输入法组合中");
+    if (isSystemImeComposing(event)) return this.skip("系统输入法组合中");
     if (event.metaKey || event.ctrlKey || event.altKey) return this.skip("带修饰键");
     if (event.shiftKey && event.key.length !== 1) return this.skip("带修饰键");
     if (this.composing) {
@@ -880,7 +892,7 @@ export default class JustTypePlugin extends Plugin {
      控制权。只在确实被接管过之后报一次，平时不啰嗦。 */
   private noteImeReleased(event: KeyboardEvent): void {
     if (!this.imeTookOver) return;
-    if (event.isComposing || event.keyCode === 229) return;
+    if (isSystemImeComposing(event)) return;
     if (event.metaKey || event.ctrlKey || event.altKey) return;
     if (event.key.length !== 1) return;
     if (!this.isEditorTarget(event.target)) return;
@@ -935,7 +947,7 @@ export default class JustTypePlugin extends Plugin {
   private handleEmojiMode(event: KeyboardEvent): void {
     if (!this.isEditorTarget(event.target)) return void this.skip("焦点不在编辑器");
     if (event.metaKey || event.ctrlKey || event.altKey) return void this.skip("带修饰键");
-    if (event.isComposing || event.keyCode === 229) return void this.skip("系统输入法组合中");
+    if (isSystemImeComposing(event)) return void this.skip("系统输入法组合中");
 
     const view = this.activeEditor();
     if (!view) return void this.skip("焦点不在编辑器");
@@ -1129,7 +1141,13 @@ export default class JustTypePlugin extends Plugin {
         const sequence = ++this.inputSequence;
         const generation = this.editorGeneration;
         void this.client!.call<string>("selectCandidateOnCurrentPage", index)
-          .then((raw) => this.applyResult(JSON.parse(raw) as RimeResult, "", view, sequence, generation));
+          .then((raw) => this.applyResult(JSON.parse(raw) as RimeResult, "", view, sequence, generation))
+          .catch((error) => {
+            console.error("RIME input failed", error);
+            this.log(`selectCandidate(${index}) 失败：${this.errorMessage(error)}`);
+            this.cancelComposition();
+            new Notice(`Just Type 输入失败：${this.errorMessage(error)}\n可运行命令「诊断报告 (report)」查看详情`, 8000);
+          });
       });
     });
     this.positionPanel(view);

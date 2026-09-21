@@ -1,0 +1,36 @@
+{
+  "myRime": "0.10.9",
+  "schemas": {
+    "pinyin-simp": "0.1.1"
+  },
+  "files": {
+    "rime.js.txt": {
+      "url": "https://cdn.jsdelivr.net/npm/@libreservice/my-rime@0.10.9/dist/rime.js",
+      "sha256": "22273c826ff871853c6126bc6d251b30acb27443269d562557c2c5b0b8b6f8ab"
+    },
+    "rime.wasm.gz": {
+      "url": "https://cdn.jsdelivr.net/npm/@libreservice/my-rime@0.10.9/dist/rime.wasm",
+      "sha256": "0a03a6147fe43bccff9f295e054cd7eb3b6056e3359ea4b232185723123b1f17"
+    },
+    "rime.data.gz": {
+      "url": "https://cdn.jsdelivr.net/npm/@libreservice/my-rime@0.10.9/dist/rime.data",
+      "sha256": "cfef452cac5f09ca6753b34d11d20ee0d844f3c4cd09ab28ee151a49278479d2"
+    },
+    "pinyin_simp.schema.yaml.gz": {
+      "url": "https://cdn.jsdelivr.net/npm/@rime-contrib/pinyin-simp@0.1.1/pinyin_simp.schema.yaml",
+      "sha256": "3f1cbbb4dcae60749a71ab186317637f785afc0edae1b7783df9d355b892e861"
+    },
+    "pinyin_simp.prism.bin.gz": {
+      "url": "https://cdn.jsdelivr.net/npm/@rime-contrib/pinyin-simp@0.1.1/pinyin_simp.prism.bin",
+      "sha256": "088c7b1345cd2725a8d707dabc36ccbe9fae4032285f5dba8ab5afbe1a61bc4f"
+    },
+    "pinyin_simp.table.bin.gz": {
+      "url": "https://cdn.jsdelivr.net/npm/@rime-contrib/pinyin-simp@0.1.1/pinyin_simp.table.bin",
+      "sha256": "148061c195d4edea881e36ae749218af8ce40f36b1d115e38007a32ba81c6031"
+    },
+    "pinyin_simp.reverse.bin.gz": {
+      "url": "https://cdn.jsdelivr.net/npm/@rime-contrib/pinyin-simp@0.1.1/pinyin_simp.reverse.bin",
+      "sha256": "f2a352d888399786be5af9e76aeb987c3993b95ddb6d1290abe43de8d24e1450"
+    }
+  }
+}

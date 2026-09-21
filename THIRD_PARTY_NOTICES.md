@@ -14,17 +14,13 @@
 | `src/vendor/my-rime-worker.txt` | [`@libreservice/my-rime`](https://www.npmjs.com/package/@libreservice/my-rime) 的 `dist/worker.js` | 0.10.9 | AGPL-3.0-or-later |
 | `rime.js`、`rime.wasm`、`rime.data` | 同上，`dist/` | 0.10.9 | AGPL-3.0-or-later |
 | `pinyin_simp.{schema.yaml,prism.bin,table.bin,reverse.bin}` | [`@rime-contrib/pinyin-simp`](https://www.npmjs.com/package/@rime-contrib/pinyin-simp)，源自 [rime/rime-pinyin-simp](https://github.com/rime/rime-pinyin-simp) | 0.1.1 | Apache-2.0 |
-| `stroke.{schema.yaml,prism.bin,table.bin,reverse.bin}` | [`@rime-contrib/stroke`](https://www.npmjs.com/package/@rime-contrib/stroke)，源自 [rime/rime-stroke](https://github.com/rime/rime-stroke) | 0.1.3 | **LGPL-3.0-only** |
+
+`pinyin_simp.schema.yaml` 在内嵌前裁掉了笔画反查（`reverse_lookup_translator`、对 `stroke` 的依赖）。二进制词库未改。
 
 许可证全文随仓库分发：
 
 - `THIRD_PARTY_LICENSE_My_RIME.txt`（AGPL-3.0）
 - `THIRD_PARTY_LICENSE_rime-pinyin-simp.txt`（Apache-2.0）
-- `THIRD_PARTY_LICENSE_rime-stroke.txt`（LGPL-3.0）
-
-> `stroke` 是 `pinyin_simp` 的依赖，用于反引号触发的笔画反查。它是就打个字内嵌体积
-> 最大的一块（原始 6.01 MB）。若将来决定去掉笔画反查，这一项及其许可证声明
-> 应一并移除。
 
 ## 通过 rime.wasm / rime.data 间接包含的组件
 

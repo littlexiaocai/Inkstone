@@ -1,10 +1,11 @@
 {
   "name": "obsidian-just-type",
-  "version": "0.7.13",
+  "version": "0.7.14",
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node esbuild.config.mjs"
+    "fetch-assets": "node scripts/fetch-assets.mjs",
+    "build": "node scripts/fetch-assets.mjs && node esbuild.config.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.25.0",

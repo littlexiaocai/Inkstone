@@ -16,7 +16,7 @@ This is the workaround I made for myself. I hope it becomes unnecessary soon.
 
 Copy `main.js`, `manifest.json`, and `styles.css` from the GitHub Release into your vault at `.obsidian/plugins/just-type/`. Restart Obsidian, then enable **Just Type IME** under Settings → Community plugins.
 
-The plugin does not use the network at runtime. The RIME engine and dictionaries ship inside `main.js` (about 6.6 MB).
+The plugin does not use the network at runtime. The RIME engine and dictionaries ship inside `main.js` (about 3 MB).
 
 ---
 
@@ -65,9 +65,18 @@ Just Type 是一个面向 iPad 外接键盘的 Obsidian 中文输入插件，用
 
 把 Release 里的 `main.js`、`manifest.json`、`styles.css` 放进 Vault 的 `.obsidian/plugins/just-type/`，重启 Obsidian 后在「设置 → 第三方插件」启用 **Just Type IME**。插件内部称「就打个字」。
 
-**运行时不联网。** RIME 引擎、引擎数据和拼音方案全部随 `main.js` 一起分发，首次启动也不需要网络。`main.js` 因此约 6.6 MB。
+**运行时不联网。** RIME 引擎、引擎数据和拼音方案全部随 `main.js` 一起分发，首次启动也不需要网络。`main.js` 约 3 MB。
 
-构建期的抓取过程见 `scripts/fetch-assets.mjs`，来源与 sha256 记录在 `src/assets/ASSETS.json`。
+构建期的抓取过程见 `scripts/fetch-assets.mjs`。上游原始字节的 sha256 锁在 `src/assets/assets.lock.json`，抓取记录在 `src/assets/ASSETS.json`。
+
+## Development
+
+```
+npm ci
+npm run build
+```
+
+`npm run build` 会先按 `assets.lock.json` 校验并抓取内嵌资源（`src/assets/*.gz` 不进 git）。锁或脚本变了才会重新下载。
 
 ## 命令
 
@@ -113,5 +122,4 @@ Just Type 是一个面向 iPad 外接键盘的 Obsidian 中文输入插件，用
 | 组件 | 许可证 |
 |---|---|
 | My RIME 0.10.9（Worker、引擎、引擎数据） | AGPL-3.0-or-later |
-| rime-pinyin-simp 方案 | Apache-2.0 |
-| rime-stroke 方案（`pinyin_simp` 的笔画反查依赖） | LGPL-3.0-only |
+| rime-pinyin-simp 方案（已裁掉笔画反查） | Apache-2.0 |

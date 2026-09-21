@@ -7,6 +7,8 @@
  *
  * 二进制在构建期 gzip，运行时用浏览器内置的 DecompressionStream 解开——只为压体积，
  * 不做任何加密或混淆。
+ *
+ * 不内嵌 stroke：产品只用拼音。笔画反查会经 stroke 拖进 luna_pinyin，体积翻倍。
  */
 import rimeScript from "./assets/rime.js.txt";
 import rimeWasmGz from "./assets/rime.wasm.gz";
@@ -15,10 +17,6 @@ import pinyinSchemaGz from "./assets/pinyin_simp.schema.yaml.gz";
 import pinyinPrismGz from "./assets/pinyin_simp.prism.bin.gz";
 import pinyinTableGz from "./assets/pinyin_simp.table.bin.gz";
 import pinyinReverseGz from "./assets/pinyin_simp.reverse.bin.gz";
-import strokeSchemaGz from "./assets/stroke.schema.yaml.gz";
-import strokePrismGz from "./assets/stroke.prism.bin.gz";
-import strokeTableGz from "./assets/stroke.table.bin.gz";
-import strokeReverseGz from "./assets/stroke.reverse.bin.gz";
 
 /** 键是文件名。Worker 请求资源时按 URL 的最后一段来找。 */
 const COMPRESSED: Record<string, Uint8Array> = {
@@ -27,11 +25,7 @@ const COMPRESSED: Record<string, Uint8Array> = {
   "pinyin_simp.schema.yaml": pinyinSchemaGz,
   "pinyin_simp.prism.bin": pinyinPrismGz,
   "pinyin_simp.table.bin": pinyinTableGz,
-  "pinyin_simp.reverse.bin": pinyinReverseGz,
-  "stroke.schema.yaml": strokeSchemaGz,
-  "stroke.prism.bin": strokePrismGz,
-  "stroke.table.bin": strokeTableGz,
-  "stroke.reverse.bin": strokeReverseGz
+  "pinyin_simp.reverse.bin": pinyinReverseGz
 };
 
 export const RIME_SCRIPT = rimeScript;
@@ -42,6 +36,9 @@ export interface LocalAssets {
 }
 
 async function gunzip(data: Uint8Array): Promise<ArrayBuffer> {
+  if (typeof DecompressionStream === "undefined") {
+    throw new Error("当前环境不支持 gzip 解压（需要 Safari 16.4+ / 对应版本的 Obsidian）。");
+  }
   const stream = new Blob([data as BlobPart]).stream().pipeThrough(new DecompressionStream("gzip"));
   return await new Response(stream).arrayBuffer();
 }
