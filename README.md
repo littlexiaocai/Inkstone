@@ -105,6 +105,18 @@ Default traces are **redacted**: `key=<letter>` / `code=<letter key>` / `kc=<con
 
 默认记录是**脱敏**的：`key=<字母>` / `code=<字母键>` / `kc=<内容>`。具名键（`Shift`、`Escape`、`Unidentified`）和关键信号（`keyCode=229`、`code=""`）原样保留，足以判断键盘行为，但还原不出输入内容。脱敏发生在写入时刻，事后开启敏感模式不会回溯暴露已记录的按键。
 
+## Feedback
+
+Open an issue: https://github.com/littlexiaocai/just-type/issues
+
+Please include Obsidian version, iPad model and iPadOS version, which keyboard you use, and whether the system keyboard was English ABC. If you can, attach the plugin's **诊断报告 (report)** — command palette → “诊断报告 (report)” or “诊断：把报告存进 Vault (save report)”.
+
+### 反馈
+
+有问题请开 Issue：https://github.com/littlexiaocai/just-type/issues
+
+请写上 Obsidian 版本、iPad 型号和系统版本、外接键盘，以及当时系统键盘是不是英文 ABC。能的话附上插件里的 **诊断报告 (report)**：命令面板搜「诊断报告 (report)」，或用「诊断：把报告存进 Vault (save report)」存成笔记再贴过来。
+
 ## Tested
 
 Device: iPad Pro 11-inch (M1), iPadOS 27.0, Obsidian 1.13.7, Magic Keyboard.
