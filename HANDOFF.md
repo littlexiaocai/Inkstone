@@ -1,6 +1,6 @@
 # 砚台输入法 / Inkstone IME —— 交接文档
 
-写给接手这个项目的人（或 AI）。截至 2026-09-21，分支 `offline-0.8.0`，提交 `84b810e`。版本已改回 **0.7.11**（用户明确要求按 0.01 递增，不跳大版本）。
+写给接手这个项目的人（或 AI）。截至 2026-09-21，`main` 在 `fcc14c2`，Release **0.7.11** 已发布。版本按 0.01 递增（用户明确要求，不跳大版本）。
 
 本文档的组织原则：**区分「已验证」和「写完了但没验」**。这个项目里绝大多数坑，
 都来自把后者当成前者。下面每一条都标了验证方式。
@@ -27,9 +27,9 @@ Obsidian 插件。在编辑器内部接管按键，用本地 RIME 引擎完成�
 
 | 项 | 值 |
 |---|---|
-| 工作分支 | `offline-0.8.0`（领先 `main` 4 个提交，**未推送**；分支名仍带 0.8.0，产品版本是 0.7.11） |
+| 工作分支 | `main`（`fcc14c2`，已推送）。历史分支名 `offline-0.8.0` 已合入 |
 | 版本 | **0.7.11** |
-| GitHub `main` | 发布 0.7.11 时推上去 |
+| GitHub `main` | `fcc14c2`（已推送） |
 | 最新 Release | **0.7.11**（离线版；目录名 Inkstone IME） |
 | `dist/main.js` | 6.6 MB（完全内嵌引擎与词库） |
 | 仓库 | https://github.com/littlexiaocai/Inkstone （公开，AGPL-3.0-or-later） |
@@ -165,7 +165,7 @@ Blob URL，然后调**原生**的 `importScripts` / `fetch`。
 
 ### P0 —— 上架前必须做
 
-1. **修两个数据正确性边界**（来自 Codex 审核第 6 项）— **代码已改，桌面/iPad 实机未验**
+1. **修两个数据正确性边界**（来自 Codex 审核第 6 项）— **代码已改；桌面已验切笔记不写入、空格上屏一次；iPad 地球键表情未复测**
    - 异步结果带着按键时的 `editorGeneration`。`active-leaf-change`、`file-open`、
      编辑器 `focusout`（焦点不是候选栏）会 `invalidateEditorContext`：generation +1、
      取消组合、作废在途结果。`applyResult` 对不上 generation 就丢弃。
@@ -175,9 +175,9 @@ Blob URL，然后调**原生**的 `importScripts` / `fetch`。
 2. **摘掉解析器里的两行 `console.log`** — **已做**（`buildLocalResolver` 的
    `importScripts` / `fetch` 不再打印）。
 
-3. **合上 `main` 并发布 0.7.11**：tag 必须与 `manifest.json` 的 version 完全一致
-   （不带 `v` 前缀），Release 里 `main.js` / `manifest.json` / `styles.css` 要作为
-   **独立文件**上传，不能只给 zip。
+3. **合上 `main` 并发布 0.7.11** — **已做**（`fcc14c2`，tag `0.7.11`，无 `v` 前缀）。
+   Release：https://github.com/littlexiaocai/Inkstone/releases/tag/0.7.11
+   资产含独立文件 `main.js` / `manifest.json` / `styles.css`，以及 zip。
 
 ### P1 —— 提交社区目录
 
