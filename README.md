@@ -24,9 +24,10 @@ Just Type 是一个面向 iPad 外接键盘的 Obsidian 中文输入插件，用
 
 **iPad + hardware keyboard.** That is the problem this plugin exists to solve, and the setup that has been tested on a real device.
 
-1. Switch the system keyboard to **English ABC**. Just Type takes over and you can type Chinese.
-2. Switch the system keyboard back to Pinyin, and Just Type steps aside. Keystrokes go to the system IME.
-3. Press **Shift** (tap it alone) to toggle Chinese and English inside Just Type. You can change this key in plugin settings.
+1. Switch the system keyboard to **English ABC**. Just Type takes over — keys go to Just Type, and you can type Pinyin Chinese or English.
+2. Press **Shift** to switch Chinese and English. Tap it alone, without holding another key. You can change this key to Control / Option / Command in plugin settings.
+3. Switch the system keyboard to Pinyin, and Just Type exits — keys go to the system IME, and Just Type stops.
+4. Emoji still uses the keyboard 🌐 globe key. Whether it opens the emoji picker depends on Emoji being enabled in your keyboard list, and on Settings → General → Keyboard → Hardware Keyboard → Press 🌐 to show Emoji.
 
 ### 适用范围
 
@@ -34,32 +35,18 @@ Just Type 是一个面向 iPad 外接键盘的 Obsidian 中文输入插件，用
 
 ### 怎么用
 
-**1. 把系统键盘切到英文 ABC** — Just Type 随即接手，可以打中文了。
+**1. 把系统键盘切到英文 ABC，Just Type 随即接手** — 按键归Just Type，可以输入拼音中文或英文。
 
-**2. 系统键盘切回拼音，Just Type 自动让位** — 按键归系统输入法，Just Type 停止工作。
+**2.按 Shift 切换中英文** — 单独按一下，中间不夹别的键。切换键可以在插件设置里改成 Control / Option / Command。
 
-**3. 按 Shift 切中英文** — 单独按一下，中间不夹别的键。切换键可以在插件设置里改成 Control / Option / Command，或者关掉只用命令。
+**3. 系统键盘切到拼音，Just Type 自动退出** — 按键归系统输入法，Just Type 停止工作。
 
 两种状态 Just Type 都会主动告诉你：
 
-- 接手时：「Just Type 已就绪——按 Shift 在中英文之间切换」
-- 让位时：「系统键盘切到中文了，Just Type 已停止工作——按键现在归系统输入法」
+- 接手时：「Just Type 已就绪——按切换键在中英文之间切换」
+- 退出时：「系统键盘切到中文了，Just Type 已停止工作——按键现在归系统输入法」
 
-### 为什么会有「让位」
-
-系统键盘的中英切换（`Ctrl+空格`）和 Just Type 的中英切换（Shift）是**两个独立的开关**。系统键盘一旦切到拼音，按键在到达插件之前就被系统输入法吃掉了，Just Type 在此模式下不工作。
-
-### iPad 屏幕软键盘
-
-可以使用相同的逻辑操作。由于本输入法主要针对外接键盘使用，如果高频使用屏幕软键盘，可以在系统里暂时关闭此输入法。
-
-## Emoji
-
-Use the system 🌐 **globe key** to open the emoji picker. Whether the globe key shows emoji depends on having Emoji enabled in your keyboard list, and on the hardware-keyboard setting: Settings → General → Keyboard → Hardware Keyboard → Press 🌐 to show Emoji.
-
-### 表情
-
-用系统的 🌐 **地球键**调出表情面板。地球键能否调出表情，取决于你的键盘列表里启用了「表情符号」，以及在实体键盘里进行设置（设置 → 通用 → 键盘 → 实体键盘 → 按下 🌐 显示表情符号）。
+**4. 表情包**，延用键盘的 🌐 地球键调出表情面板。地球键能否调出表情，取决于键盘列表里是否启用了「表情符号」，以及在实体键盘里的设置（设置 → 通用 → 键盘 → 实体键盘 → 按下 🌐 显示表情符号）。
 
 ## Commands
 
