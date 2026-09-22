@@ -53,20 +53,6 @@ Just Type 是一个面向 iPad 外接键盘的 Obsidian 中文输入插件，用
 
 可以使用相同的逻辑操作。由于本输入法主要针对外接键盘使用，如果高频使用屏幕软键盘，可以在系统里暂时关闭此输入法。
 
-## Installation
-
-Copy `main.js`, `manifest.json`, and `styles.css` from the GitHub Release into your vault at `.obsidian/plugins/just-type/`. Restart Obsidian, then enable **Just Type IME** under Settings → Community plugins.
-
-The plugin does not use the network at runtime. The RIME engine and dictionaries ship inside `main.js` (about 3 MB).
-
-### 安装
-
-把 Release 里的 `main.js`、`manifest.json`、`styles.css` 放进 Vault 的 `.obsidian/plugins/just-type/`，重启 Obsidian 后在「设置 → 第三方插件」启用 **Just Type IME**。插件内部称「就打个字」。
-
-**运行时不联网。** RIME 引擎、引擎数据和拼音方案全部随 `main.js` 一起分发，首次启动也不需要网络。`main.js` 约 3 MB。
-
-构建期的抓取过程见 `scripts/fetch-assets.mjs`。上游原始字节的 sha256 锁在 `src/assets/assets.lock.json`，抓取记录在 `src/assets/ASSETS.json`。
-
 ## Emoji
 
 Use the system 🌐 **globe key** to open the emoji picker. Whether the globe key shows emoji depends on having Emoji enabled in your keyboard list, and on the hardware-keyboard setting: Settings → General → Keyboard → Hardware Keyboard → Press 🌐 to show Emoji.
@@ -74,17 +60,6 @@ Use the system 🌐 **globe key** to open the emoji picker. Whether the globe ke
 ### 表情
 
 用系统的 🌐 **地球键**调出表情面板。地球键能否调出表情，取决于你的键盘列表里启用了「表情符号」，以及在实体键盘里进行设置（设置 → 通用 → 键盘 → 实体键盘 → 按下 🌐 显示表情符号）。
-
-## Development
-
-```
-npm ci
-npm run build
-```
-
-`npm run build` fetches and verifies bundled assets against `assets.lock.json` (`src/assets/*.gz` are not in git). It re-downloads only when the lock or the fetch script changes.
-
-`npm run build` 会先按 `assets.lock.json` 校验并抓取内嵌资源（`src/assets/*.gz` 不进 git）。锁或脚本变了才会重新下载。
 
 ## Commands
 
@@ -118,36 +93,6 @@ If you can, include your iPad model, iPadOS version, Obsidian version, and a scr
 如果你遇到了问题，欢迎通过 GitHub Issues 提交：https://github.com/littlexiaocai/just-type/issues
 不方便使用 GitHub，也可以直接发邮件给我：xxyybear@gmail.com
 如果方便，请附上 iPad 型号、iPadOS 版本、Obsidian 版本以及问题截图或录屏。
-
-## Tested
-
-Device: iPad Pro 11-inch (M1), iPadOS 27.0, Obsidian 1.13.7, Magic Keyboard.
-
-Verified:
-
-- Chinese input with a hardware keyboard is smooth; the core assumption holds
-- iPad on-screen software keyboard: verified
-- Takeover / step-aside notices when switching the system keyboard
-- Globe-key emoji lands in the document reliably
-
-实测环境：iPad Pro 11 英寸（M1）、iPadOS 27.0、Obsidian 1.13.7、妙控键盘。
-
-已验证：
-
-- iPad 外接键盘下中文输入流畅，核心假设成立
-- iPad 屏幕软键盘：已经验证
-- 系统键盘切换时的接手 / 让位提示
-- 地球键调出的表情稳定进入文档
-
-## Known limits
-
-- Key capture is on the `document` capture phase, which bypasses CodeMirror extension priority and may conflict with other plugins' hotkeys.
-- Moving the caret with a mouse click inside the same editor does not yet reset composition. Blur, switching notes, and switching panes cancel composition and drop in-flight results.
-- Not all Markdown shortcuts, candidate-page buttons, or a full settings UI are handled yet.
-
-- 输入拦截挂在 `document` 捕获层，绕开了 CodeMirror 的扩展优先级体系，可能与其他插件的快捷键冲突。
-- 同一编辑器内用鼠标点选移动光标时，组合态尚未重置。失焦、切笔记、切窗格会取消组合并作废在途结果。
-- 暂未处理所有 Markdown 快捷键、候选翻页按钮和用户设置界面。
 
 ## 上游项目与许可
 
