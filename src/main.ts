@@ -3,7 +3,7 @@ import workerSource from "./vendor/my-rime-worker.txt";
 import { assetSummary, loadLocalAssets, type LocalAssets } from "./assets";
 import { searchEmoji, type EmojiEntry } from "./emoji";
 
-const PLUGIN_VERSION = "0.7.16";
+const PLUGIN_VERSION = "0.7.17";
 const INIT_TIMEOUT_MS = 45000;
 const MAX_TRACE = 60;
 const REPORT_FOLDER = "就打个字诊断";
@@ -278,11 +278,29 @@ const TOGGLE_KEY_LABEL: Record<ToggleKey, string> = {
   none: "关闭（只用命令或状态栏切换）"
 };
 
+/* 候选栏里拼音音节之间的分隔符。RIME 方案的 delimiter 第一个字符是空格，
+   所以引擎给出的是 "huo xu hui"；这里只改显示，不动引擎。默认撇号，
+   与微信、搜狗等输入法一致，新用户最眼熟。 */
+type PinyinSeparator = "apostrophe" | "space" | "dot";
+
+const PINYIN_SEPARATOR_CHAR: Record<PinyinSeparator, string> = {
+  apostrophe: "'",
+  space: " ",
+  dot: "·"
+};
+
+const PINYIN_SEPARATOR_LABEL: Record<PinyinSeparator, string> = {
+  apostrophe: "撇号　huo'xu'hui（微信 / 搜狗风格）",
+  space: "空格　huo xu hui",
+  dot: "间隔点　huo·xu·hui"
+};
+
 interface JustTypeSettings {
   toggleKey: ToggleKey;
+  pinyinSeparator: PinyinSeparator;
 }
 
-const DEFAULT_SETTINGS: JustTypeSettings = { toggleKey: "Shift" };
+const DEFAULT_SETTINGS: JustTypeSettings = { toggleKey: "Shift", pinyinSeparator: "apostrophe" };
 
 const MODE_LABEL: Record<InputMode, string> = { chinese: "Just Type 中", english: "Just Type 英", emoji: "Just Type 😀" };
 const MODE_NOTICE: Record<InputMode, string> = {
@@ -314,6 +332,15 @@ class JustTypeSettingTab extends PluginSettingTab {
         key: "toggleKey",
         options: { ...TOGGLE_KEY_LABEL }
       }
+    }, {
+      name: "拼音分隔符",
+      desc: "候选栏里拼音音节之间用什么隔开。只影响显示，不影响输入。",
+      aliases: ["separator", "delimiter", "分隔", "撇号", "空格"],
+      control: {
+        type: "dropdown",
+        key: "pinyinSeparator",
+        options: { ...PINYIN_SEPARATOR_LABEL }
+      }
     }];
   }
 
@@ -331,6 +358,20 @@ class JustTypeSettingTab extends PluginSettingTab {
         dropdown.setValue(this.plugin.settings.toggleKey);
         dropdown.onChange(async (value) => {
           this.plugin.settings.toggleKey = value as ToggleKey;
+          await this.plugin.saveData(this.plugin.settings);
+        });
+      });
+
+    new Setting(containerEl)
+      .setName("拼音分隔符")
+      .setDesc("候选栏里拼音音节之间用什么隔开。只影响显示，不影响输入。")
+      .addDropdown((dropdown) => {
+        for (const [value, label] of Object.entries(PINYIN_SEPARATOR_LABEL)) {
+          dropdown.addOption(value, label);
+        }
+        dropdown.setValue(this.plugin.settings.pinyinSeparator);
+        dropdown.onChange(async (value) => {
+          this.plugin.settings.pinyinSeparator = value as PinyinSeparator;
           await this.plugin.saveData(this.plugin.settings);
         });
       });
@@ -1122,12 +1163,19 @@ export default class JustTypePlugin extends Plugin {
     panel.style.top = `${Math.round(top)}px`;
   }
 
+  /* 引擎用空格分隔音节。汉字部分（已选定的词）不含空格，所以整串替换是安全的；
+     用户手打的撇号原样保留。 */
+  formatPreedit(text: string): string {
+    const sep = PINYIN_SEPARATOR_CHAR[this.settings.pinyinSeparator] ?? "'";
+    return sep === " " ? text : text.replace(/ /g, sep);
+  }
+
   private renderPanel(result: RimeResult, view: MarkdownView): void {
     if (!this.panel || !this.preedit || !this.candidates) return;
     const head = result.head ?? "";
     const body = result.body ?? "";
     const tail = result.tail ?? "";
-    this.preedit.setText(`${head}${body}${tail}`);
+    this.preedit.setText(this.formatPreedit(`${head}${body}${tail}`));
     this.candidates.empty();
     (result.candidates ?? []).forEach((candidate, index) => {
       const label = result.selectLabels?.[index] ?? String(index + 1);

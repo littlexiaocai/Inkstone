@@ -396,7 +396,7 @@ function searchEmoji(query, limit) {
 }
 
 // src/main.ts
-var PLUGIN_VERSION = "0.7.16";
+var PLUGIN_VERSION = "0.7.17";
 var INIT_TIMEOUT_MS = 45e3;
 var MAX_TRACE = 60;
 var REPORT_FOLDER = "\u5C31\u6253\u4E2A\u5B57\u8BCA\u65AD";
@@ -596,7 +596,17 @@ var TOGGLE_KEY_LABEL = {
   Meta: "Command / Win",
   none: "\u5173\u95ED\uFF08\u53EA\u7528\u547D\u4EE4\u6216\u72B6\u6001\u680F\u5207\u6362\uFF09"
 };
-var DEFAULT_SETTINGS = { toggleKey: "Shift" };
+var PINYIN_SEPARATOR_CHAR = {
+  apostrophe: "'",
+  space: " ",
+  dot: "\xB7"
+};
+var PINYIN_SEPARATOR_LABEL = {
+  apostrophe: "\u6487\u53F7\u3000huo'xu'hui\uFF08\u5FAE\u4FE1 / \u641C\u72D7\u98CE\u683C\uFF09",
+  space: "\u7A7A\u683C\u3000huo xu hui",
+  dot: "\u95F4\u9694\u70B9\u3000huo\xB7xu\xB7hui"
+};
+var DEFAULT_SETTINGS = { toggleKey: "Shift", pinyinSeparator: "apostrophe" };
 var MODE_LABEL = { chinese: "Just Type \u4E2D", english: "Just Type \u82F1", emoji: "Just Type \u{1F600}" };
 var MODE_NOTICE = {
   chinese: "\u4E2D\u6587",
@@ -618,6 +628,15 @@ var JustTypeSettingTab = class extends import_obsidian.PluginSettingTab {
         key: "toggleKey",
         options: { ...TOGGLE_KEY_LABEL }
       }
+    }, {
+      name: "\u62FC\u97F3\u5206\u9694\u7B26",
+      desc: "\u5019\u9009\u680F\u91CC\u62FC\u97F3\u97F3\u8282\u4E4B\u95F4\u7528\u4EC0\u4E48\u9694\u5F00\u3002\u53EA\u5F71\u54CD\u663E\u793A\uFF0C\u4E0D\u5F71\u54CD\u8F93\u5165\u3002",
+      aliases: ["separator", "delimiter", "\u5206\u9694", "\u6487\u53F7", "\u7A7A\u683C"],
+      control: {
+        type: "dropdown",
+        key: "pinyinSeparator",
+        options: { ...PINYIN_SEPARATOR_LABEL }
+      }
     }];
   }
   display() {
@@ -630,6 +649,16 @@ var JustTypeSettingTab = class extends import_obsidian.PluginSettingTab {
       dropdown.setValue(this.plugin.settings.toggleKey);
       dropdown.onChange(async (value) => {
         this.plugin.settings.toggleKey = value;
+        await this.plugin.saveData(this.plugin.settings);
+      });
+    });
+    new import_obsidian.Setting(containerEl).setName("\u62FC\u97F3\u5206\u9694\u7B26").setDesc("\u5019\u9009\u680F\u91CC\u62FC\u97F3\u97F3\u8282\u4E4B\u95F4\u7528\u4EC0\u4E48\u9694\u5F00\u3002\u53EA\u5F71\u54CD\u663E\u793A\uFF0C\u4E0D\u5F71\u54CD\u8F93\u5165\u3002").addDropdown((dropdown) => {
+      for (const [value, label] of Object.entries(PINYIN_SEPARATOR_LABEL)) {
+        dropdown.addOption(value, label);
+      }
+      dropdown.setValue(this.plugin.settings.pinyinSeparator);
+      dropdown.onChange(async (value) => {
+        this.plugin.settings.pinyinSeparator = value;
         await this.plugin.saveData(this.plugin.settings);
       });
     });
@@ -1295,12 +1324,18 @@ var JustTypePlugin = class extends import_obsidian.Plugin {
     panel.style.left = `${Math.round(left)}px`;
     panel.style.top = `${Math.round(top)}px`;
   }
+  /* 引擎用空格分隔音节。汉字部分（已选定的词）不含空格，所以整串替换是安全的；
+     用户手打的撇号原样保留。 */
+  formatPreedit(text) {
+    const sep = PINYIN_SEPARATOR_CHAR[this.settings.pinyinSeparator] ?? "'";
+    return sep === " " ? text : text.replace(/ /g, sep);
+  }
   renderPanel(result, view) {
     if (!this.panel || !this.preedit || !this.candidates) return;
     const head = result.head ?? "";
     const body = result.body ?? "";
     const tail = result.tail ?? "";
-    this.preedit.setText(`${head}${body}${tail}`);
+    this.preedit.setText(this.formatPreedit(`${head}${body}${tail}`));
     this.candidates.empty();
     (result.candidates ?? []).forEach((candidate, index) => {
       const label = result.selectLabels?.[index] ?? String(index + 1);
