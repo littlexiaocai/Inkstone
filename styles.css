@@ -61,6 +61,8 @@
   text-decoration-color: var(--text-accent);
   text-decoration-thickness: 2px;
   text-underline-offset: 3px;
+  /* 默认会在 g / y / q 的下伸部分断开，拼音里这类字母多，看着像虚线。 */
+  text-decoration-skip-ink: none;
 }
 
 .just-type-candidates {

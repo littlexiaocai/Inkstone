@@ -438,7 +438,7 @@ function searchEmoji(query, limit) {
 }
 
 // src/main.ts
-var PLUGIN_VERSION = "0.7.18";
+var PLUGIN_VERSION = "0.7.19";
 var INIT_TIMEOUT_MS = 45e3;
 var MAX_TRACE = 60;
 var REPORT_FOLDER = "\u5C31\u6253\u4E2A\u5B57\u8BCA\u65AD";
@@ -803,7 +803,8 @@ var JustTypePlugin = class extends import_obsidian.Plugin {
     this.traceRawKeys = false;
   }
   async onload() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const saved = await this.loadData();
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, saved);
     this.addSettingTab(new JustTypeSettingTab(this.app, this));
     this.log(`\u63D2\u4EF6 ${PLUGIN_VERSION} \u8F7D\u5165`);
     this.log(this.environmentLine());

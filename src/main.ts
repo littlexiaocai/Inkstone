@@ -5,7 +5,7 @@ import workerSource from "./vendor/my-rime-worker.txt";
 import { assetSummary, loadLocalAssets, type LocalAssets } from "./assets";
 import { searchEmoji, type EmojiEntry } from "./emoji";
 
-const PLUGIN_VERSION = "0.7.18";
+const PLUGIN_VERSION = "0.7.19";
 const INIT_TIMEOUT_MS = 45000;
 const MAX_TRACE = 60;
 const REPORT_FOLDER = "就打个字诊断";
@@ -496,7 +496,8 @@ export default class JustTypePlugin extends Plugin {
   private traceRawKeys = false;
 
   async onload(): Promise<void> {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const saved = (await this.loadData()) as Partial<JustTypeSettings> | null;
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, saved);
     this.addSettingTab(new JustTypeSettingTab(this.app, this));
     this.log(`插件 ${PLUGIN_VERSION} 载入`);
     this.log(this.environmentLine());
