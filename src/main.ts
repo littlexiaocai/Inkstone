@@ -1,9 +1,11 @@
 import { App, MarkdownView, Modal, Notice, Platform, Plugin, PluginSettingTab, Setting, SettingDefinitionItem, setIcon } from "obsidian";
+import type { EditorView } from "@codemirror/view";
+import { INLINE_PREEDIT_CLASS, inlinePreeditEffect, inlinePreeditExtension } from "./inline-preedit";
 import workerSource from "./vendor/my-rime-worker.txt";
 import { assetSummary, loadLocalAssets, type LocalAssets } from "./assets";
 import { searchEmoji, type EmojiEntry } from "./emoji";
 
-const PLUGIN_VERSION = "0.7.17";
+const PLUGIN_VERSION = "0.7.18";
 const INIT_TIMEOUT_MS = 45000;
 const MAX_TRACE = 60;
 const REPORT_FOLDER = "就打个字诊断";
@@ -278,7 +280,7 @@ const TOGGLE_KEY_LABEL: Record<ToggleKey, string> = {
   none: "关闭（只用命令或状态栏切换）"
 };
 
-/* 候选栏里拼音音节之间的分隔符。RIME 方案的 delimiter 第一个字符是空格，
+/* 拼音音节之间的分隔符。RIME 方案的 delimiter 第一个字符是空格，
    所以引擎给出的是 "huo xu hui"；这里只改显示，不动引擎。默认撇号，
    与微信、搜狗等输入法一致，新用户最眼熟。 */
 type PinyinSeparator = "apostrophe" | "space" | "dot";
@@ -295,12 +297,22 @@ const PINYIN_SEPARATOR_LABEL: Record<PinyinSeparator, string> = {
   dot: "间隔点　huo·xu·hui"
 };
 
+/* 拼音画在哪。行内＝光标处带下划线（微信 / 系统输入法的样子），候选栏只剩一行；
+   候选栏上方＝0.7.17 及以前的样子，留着给行内显示出问题时退回。 */
+type PreeditPosition = "inline" | "panel";
+
+const PREEDIT_POSITION_LABEL: Record<PreeditPosition, string> = {
+  inline: "行内　拼音在光标处，和微信输入法一样",
+  panel: "候选栏上方　旧版样式"
+};
+
 interface JustTypeSettings {
   toggleKey: ToggleKey;
   pinyinSeparator: PinyinSeparator;
+  preeditPosition: PreeditPosition;
 }
 
-const DEFAULT_SETTINGS: JustTypeSettings = { toggleKey: "Shift", pinyinSeparator: "apostrophe" };
+const DEFAULT_SETTINGS: JustTypeSettings = { toggleKey: "Shift", pinyinSeparator: "apostrophe", preeditPosition: "inline" };
 
 const MODE_LABEL: Record<InputMode, string> = { chinese: "Just Type 中", english: "Just Type 英", emoji: "Just Type 😀" };
 const MODE_NOTICE: Record<InputMode, string> = {
@@ -333,8 +345,17 @@ class JustTypeSettingTab extends PluginSettingTab {
         options: { ...TOGGLE_KEY_LABEL }
       }
     }, {
+      name: "拼音显示位置",
+      desc: "正在打的拼音显示在哪里。只影响显示，不影响输入。",
+      aliases: ["preedit", "inline", "拼音", "行内", "位置"],
+      control: {
+        type: "dropdown",
+        key: "preeditPosition",
+        options: { ...PREEDIT_POSITION_LABEL }
+      }
+    }, {
       name: "拼音分隔符",
-      desc: "候选栏里拼音音节之间用什么隔开。只影响显示，不影响输入。",
+      desc: "拼音音节之间用什么隔开。只影响显示，不影响输入。",
       aliases: ["separator", "delimiter", "分隔", "撇号", "空格"],
       control: {
         type: "dropdown",
@@ -363,8 +384,22 @@ class JustTypeSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
+      .setName("拼音显示位置")
+      .setDesc("正在打的拼音显示在哪里。只影响显示，不影响输入。")
+      .addDropdown((dropdown) => {
+        for (const [value, label] of Object.entries(PREEDIT_POSITION_LABEL)) {
+          dropdown.addOption(value, label);
+        }
+        dropdown.setValue(this.plugin.settings.preeditPosition);
+        dropdown.onChange(async (value) => {
+          this.plugin.settings.preeditPosition = value as PreeditPosition;
+          await this.plugin.saveData(this.plugin.settings);
+        });
+      });
+
+    new Setting(containerEl)
       .setName("拼音分隔符")
-      .setDesc("候选栏里拼音音节之间用什么隔开。只影响显示，不影响输入。")
+      .setDesc("拼音音节之间用什么隔开。只影响显示，不影响输入。")
       .addDropdown((dropdown) => {
         for (const [value, label] of Object.entries(PINYIN_SEPARATOR_LABEL)) {
           dropdown.addOption(value, label);
@@ -432,6 +467,8 @@ export default class JustTypePlugin extends Plugin {
   private panel?: HTMLDivElement;
   private preedit?: HTMLDivElement;
   private candidates?: HTMLDivElement;
+  /* 当前画着行内拼音的那个编辑器。清除时必须清它，而不是清「现在的活动编辑器」。 */
+  private inlineTarget?: EditorView;
   private status?: HTMLElement;
   private ribbon?: HTMLElement;
   private inputSequence = 0;
@@ -465,6 +502,7 @@ export default class JustTypePlugin extends Plugin {
     this.log(this.environmentLine());
 
     this.createPanel();
+    this.registerEditorExtension(inlinePreeditExtension);
     this.registerCommands();
     this.createControls();
     this.registerDomEvent(document, "keydown", (event) => this.onKeydown(event), true);
@@ -506,6 +544,7 @@ export default class JustTypePlugin extends Plugin {
   }
 
   onunload(): void {
+    this.setInlinePreedit(undefined, "");
     this.client?.destroy();
     this.panel?.remove();
   }
@@ -1012,8 +1051,8 @@ export default class JustTypePlugin extends Plugin {
     if (sequence <= this.discardThrough || generation !== this.editorGeneration) return;
     if (result.state === 0) {
       this.composing = false;
-      if (result.committed) view.editor.replaceSelection(result.committed);
       this.hidePanel();
+      if (result.committed) view.editor.replaceSelection(result.committed);
       return;
     }
     if (result.state === 1) {
@@ -1084,6 +1123,7 @@ export default class JustTypePlugin extends Plugin {
   private renderEmojiPanel(view: MarkdownView): void {
     if (!this.panel || !this.preedit || !this.candidates) return;
     this.emojiHits = searchEmoji(this.emojiQuery, EMOJI_PAGE);
+    this.panel.removeClass("is-inline");
 
     this.preedit.setText(this.emojiQuery ? `😀 ${this.emojiQuery}` : "😀 打关键词搜索表情（xiao / smile / huo）");
     this.candidates.empty();
@@ -1102,7 +1142,7 @@ export default class JustTypePlugin extends Plugin {
       button.addEventListener("click", () => this.commitEmoji(index, view));
     });
 
-    this.positionPanel(view);
+    this.positionPanel(this.caretRect(view));
     this.panel.addClass("is-visible");
   }
 
@@ -1127,10 +1167,44 @@ export default class JustTypePlugin extends Plugin {
     return null;
   }
 
-  private positionPanel(view: MarkdownView): void {
+  private editorViewOf(view: MarkdownView): EditorView | undefined {
+    return (view.editor as unknown as { cm?: EditorView }).cm;
+  }
+
+  /* 空字符串＝清除。换了编辑器先清旧的，免得旧笔记里留一截拼音。 */
+  private setInlinePreedit(view: MarkdownView | undefined, text: string): void {
+    const target = text && view ? this.editorViewOf(view) : undefined;
+    if (this.inlineTarget && this.inlineTarget !== target) {
+      this.dispatchPreedit(this.inlineTarget, "");
+      this.inlineTarget = undefined;
+    }
+    if (!target) return;
+    this.dispatchPreedit(target, text);
+    this.inlineTarget = target;
+  }
+
+  private dispatchPreedit(cm: EditorView, text: string): void {
+    try {
+      cm.dispatch({ effects: inlinePreeditEffect.of(text) });
+    } catch (error) {
+      // 编辑器已被关掉（窗格关闭、插件卸载）时 dispatch 可能抛错，没什么可清的了。
+      this.log(`行内拼音更新失败：${this.errorMessage(error)}`);
+    }
+  }
+
+  /* 行内拼音的位置：候选栏贴在拼音开头的正下方。拼音折行时用第一行的左边、整体的底边。 */
+  private inlinePreeditRect(): { left: number; top: number; bottom: number } | null {
+    const el = this.inlineTarget?.contentDOM.querySelector(`.${INLINE_PREEDIT_CLASS}`);
+    if (!el) return null;
+    const box = el.getBoundingClientRect();
+    const first = el.getClientRects()[0] ?? box;
+    if (!box.width && !box.height) return null;
+    return { left: first.left, top: box.top, bottom: box.bottom };
+  }
+
+  private positionPanel(caret: { left: number; top: number; bottom: number } | null): void {
     const panel = this.panel;
     if (!panel) return;
-    const caret = this.caretRect(view);
     if (!caret) {
       panel.removeClass("is-anchored");
       panel.style.removeProperty("left");
@@ -1175,7 +1249,11 @@ export default class JustTypePlugin extends Plugin {
     const head = result.head ?? "";
     const body = result.body ?? "";
     const tail = result.tail ?? "";
-    this.preedit.setText(this.formatPreedit(`${head}${body}${tail}`));
+    const text = this.formatPreedit(`${head}${body}${tail}`);
+    const inline = this.settings.preeditPosition === "inline" && Boolean(this.editorViewOf(view));
+    this.panel.toggleClass("is-inline", inline);
+    this.preedit.setText(inline ? "" : text);
+    this.setInlinePreedit(inline ? view : undefined, inline ? text : "");
     this.candidates.empty();
     (result.candidates ?? []).forEach((candidate, index) => {
       const label = result.selectLabels?.[index] ?? String(index + 1);
@@ -1198,7 +1276,7 @@ export default class JustTypePlugin extends Plugin {
           });
       });
     });
-    this.positionPanel(view);
+    this.positionPanel((inline ? this.inlinePreeditRect() : null) ?? this.caretRect(view));
     this.panel.addClass("is-visible");
   }
 
@@ -1228,6 +1306,7 @@ export default class JustTypePlugin extends Plugin {
   }
 
   private hidePanel(): void {
+    this.setInlinePreedit(undefined, "");
     this.panel?.removeClass("is-visible");
     this.preedit?.setText("");
     this.candidates?.empty();

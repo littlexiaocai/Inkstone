@@ -45,6 +45,24 @@
   font-weight: 600;
 }
 
+/* 行内拼音时候选栏只剩一行，收紧边距。 */
+.just-type-panel.is-inline {
+  padding: 6px;
+}
+
+.just-type-panel.is-inline .just-type-preedit {
+  display: none;
+}
+
+/* 编辑器里的行内拼音：沿用正文字体字号，只加一条下划线标明「还没上屏」。 */
+.just-type-inline-preedit {
+  color: var(--text-normal);
+  text-decoration: underline;
+  text-decoration-color: var(--text-accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
 .just-type-candidates {
   display: flex;
   gap: 6px;
